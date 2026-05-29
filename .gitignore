@@ -1,0 +1,20 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+escenarios/escenarios_test/escenario1_untracked/
+escenarios/escenarios_test/escenario2_untracked/
+escenarios/escenarios_test/escenario3_untracked/
+escenarios/escenarios_train/house2_untracked/
+escenarios/escenarios_train/house3_untracked/
+escenarios/escenarios_train/house1_untracked/
+escenarios/escenarios_train/car_untracked/
+escenarios/escenarios_train/teatro_griego_untracked/
+escenarios/escenarios_train/truck_untracked/

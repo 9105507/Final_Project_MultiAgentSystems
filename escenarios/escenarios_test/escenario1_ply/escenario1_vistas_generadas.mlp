@@ -1,0 +1,42 @@
+<!DOCTYPE MeshLabDocument>
+<MeshLabProject>
+ <MeshGroup>
+  <MLMesh filename="../OneDrive - UFV/Escritorio/mike/Máster Inteligencia Artificial UPM/Sistemas Multiagente/Final Project/src/escenarios/escenarios_test/escenario1_ply/01_D_puntos_desplazados_filtrados.ply" idInFile="-1" label="01_D_puntos_desplazados_filtrados.ply" visible="1">
+   <MLMatrix44>
+1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 
+</MLMatrix44>
+   <RenderingOption pointColor="7 7 252 255" wireWidth="1" solidColor="192 192 192 255" boxColor="234 234 234 255" wireColor="64 64 64 255" pointSize="3">000000000000000000000100000001000000001010100000000100111011110000111101</RenderingOption>
+  </MLMesh>
+  <MLMesh filename="../OneDrive - UFV/Escritorio/mike/Máster Inteligencia Artificial UPM/Sistemas Multiagente/Final Project/src/escenarios/escenarios_test/escenario1_ply/02_centroides_primera_fase.ply" idInFile="-1" label="02_centroides_primera_fase.ply" visible="1">
+   <MLMatrix44>
+1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 
+</MLMatrix44>
+   <RenderingOption pointColor="12 252 244 255" wireWidth="1" solidColor="192 192 192 255" boxColor="234 234 234 255" wireColor="64 64 64 255" pointSize="6">000000000000000000000100000001000000001010100000000100111011110000111101</RenderingOption>
+  </MLMesh>
+  <MLMesh filename="../OneDrive - UFV/Escritorio/mike/Máster Inteligencia Artificial UPM/Sistemas Multiagente/Final Project/src/escenarios/escenarios_test/escenario1_ply/03_centroides_filtrados_distancia.ply" idInFile="-1" label="03_centroides_filtrados_distancia.ply" visible="1">
+   <MLMatrix44>
+1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 
+</MLMatrix44>
+   <RenderingOption pointColor="8 252 16 255" wireWidth="1" solidColor="192 192 192 255" boxColor="234 234 234 255" wireColor="64 64 64 255" pointSize="6">000000000000000000000100000001000000001010100000000100111011110000111101</RenderingOption>
+  </MLMesh>
+  <MLMesh filename="../OneDrive - UFV/Escritorio/mike/Máster Inteligencia Artificial UPM/Sistemas Multiagente/Final Project/src/escenarios/escenarios_test/escenario1_ply/04_viewpoints_finales.ply" idInFile="-1" label="04_viewpoints_finales.ply" visible="1">
+   <MLMatrix44>
+1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 
+</MLMatrix44>
+   <RenderingOption pointColor="252 58 24 255" wireWidth="1" solidColor="192 192 192 255" boxColor="234 234 234 255" wireColor="64 64 64 255" pointSize="10">000110000000000000000100000001000000001010100000000100111011110000111101</RenderingOption>
+  </MLMesh>
+  <MLMesh filename="../OneDrive - UFV/Escritorio/mike/Máster Inteligencia Artificial UPM/Sistemas Multiagente/Final Project/src/escenarios/escenarios_test/escenario1_ply/escenario1.ply" idInFile="-1" label="escenario1.ply" visible="1">
+   <MLMatrix44>
+1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 
+</MLMatrix44>
+   <RenderingOption pointColor="252 233 79 255" wireWidth="1" solidColor="192 192 192 255" boxColor="234 234 234 255" wireColor="220 213 20 255" pointSize="3">010001010000000000000110000001000110010010000000010100011010100000001001</RenderingOption>
+  </MLMesh>
+  <MLMesh filename="ruta_aco_meshlab.ply" idInFile="-1" label="ruta_aco_meshlab.ply" visible="1">
+   <MLMatrix44>
+1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 
+</MLMatrix44>
+   <RenderingOption pointColor="252 233 79 255" wireWidth="1" solidColor="192 192 192 255" boxColor="234 234 234 255" wireColor="64 64 64 255" pointSize="3">100001010000000000000000000001010110000010100000000100111010100000001001</RenderingOption>
+  </MLMesh>
+ </MeshGroup>
+ <RasterGroup/>
+</MeshLabProject>
