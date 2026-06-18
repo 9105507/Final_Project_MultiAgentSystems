@@ -8,7 +8,36 @@ from pathlib import Path
 
 def export_point_cloud(points, output_path, color=[1.0, 0.0, 0.0], verbose=False):
     """
-    Exporta una nube de puntos a PLY para visualizar en MeshLab.
+    Exporta una nube de puntos a un archivo PLY para su visualización externa.
+
+    La función convierte un conjunto de puntos 3D en una nube de puntos de Open3D,
+    le asigna un color uniforme y la guarda en formato PLY. Este formato puede
+    abrirse posteriormente en herramientas como MeshLab.
+
+    Parámetros
+    ----------
+    points : np.ndarray de shape (N, 3)
+        Conjunto de puntos 3D a exportar. Cada fila representa un punto con
+        coordenadas (x, y, z).
+
+    output_path : str o pathlib.Path
+        Ruta de salida donde se guardará el archivo PLY. Si la carpeta de destino
+        no existe, se crea automáticamente.
+
+    color : list de float, opcional
+        Color uniforme asignado a todos los puntos de la nube. Debe indicarse en
+        formato RGB normalizado, con valores entre 0.0 y 1.0.
+        Por defecto, el color es rojo: [1.0, 0.0, 0.0].
+
+    verbose : bool, opcional
+        Si es True, muestra por consola la ruta del archivo exportado y el número
+        de puntos guardados. Por defecto es False.
+
+    Retorna
+    -------
+    None
+        La función no devuelve ningún valor. Su resultado es la creación de un
+        archivo PLY en la ruta indicada.
     """
     points = np.asarray(points)
 
@@ -30,7 +59,7 @@ def export_point_cloud(points, output_path, color=[1.0, 0.0, 0.0], verbose=False
     )
 
     if verbose:
-        print(f"Exportado: {output_path} | puntos: {points.shape[0]}")
+        print(f"└──Exportado: {output_path} | puntos: {points.shape[0]}")
 
 def filter_viewpoints_outside_and_above_ground(points, mesh, vertices, ground_margin=0.08):
     """
@@ -42,10 +71,13 @@ def filter_viewpoints_outside_and_above_ground(points, mesh, vertices, ground_ma
     ----------
     points : np.ndarray de shape (N, 3)
         Puntos a filtrar.
+
     mesh : open3d.geometry.TriangleMesh
         Malla original.
+
     vertices : np.ndarray de shape (M, 3)
         Vértices de la malla.
+
     ground_margin : float
         Margen por encima del suelo para aceptar puntos.
 
@@ -70,7 +102,6 @@ def filter_viewpoints_outside_and_above_ground(points, mesh, vertices, ground_ma
 
     signed_distances = scene.compute_signed_distance(points_tensor).numpy()
 
-    # En tu caso:
     # signed_distance > 0  --> punto fuera
     # signed_distance < 0  --> punto dentro
     mask_outside = signed_distances > 0
@@ -88,25 +119,14 @@ def filter_viewpoints_outside_and_above_ground(points, mesh, vertices, ground_ma
 
     return filtered_points
 
-def generar_puntos_de_vista(
-    mesh_path,
-    d_f=0.15,
-    R_1=0.02,
-    d_min=0.1,
-    R_2=0.06,
-    min_samples=1,
-    ground_margin=0.08,
-    export_intermediate=False,
-    output_dir=None,
-    verbose=False
-):
+def generar_puntos_de_vista(mesh_path, d_f=0.15, R_1=0.02, d_min=0.1, R_2=0.06, min_samples=1, ground_margin=0.08, export_intermediate=False, output_dir=None, verbose=False):
     """
     Genera puntos de vista a partir de una malla triangular.
 
     Parámetros
     ----------
     mesh_path : str
-        Ruta de la malla .ply o .obj.
+        Ruta de la malla .ply.
 
     d_f : float
         Distancia de desplazamiento desde el centro de cada triángulo.
@@ -147,11 +167,6 @@ def generar_puntos_de_vista(
     if mesh.is_empty():
         raise ValueError(f"No se ha podido leer la malla: {mesh_path}")
 
-    # mesh.remove_duplicated_vertices()
-    # mesh.remove_duplicated_triangles()
-    # mesh.remove_degenerate_triangles()
-
-    # mesh.orient_triangles()
     mesh.compute_triangle_normals()
 
     vertices = np.asarray(mesh.vertices)
@@ -168,19 +183,6 @@ def generar_puntos_de_vista(
 
     triangle_vertices = vertices[triangles]
     triangle_centers = triangle_vertices.mean(axis=1)
-
-    # ============================================================
-    # CORREGIR ORIENTACIÓN GLOBAL DE NORMALES
-    # ============================================================
-
-    # mesh_center = vertices.mean(axis=0)
-
-    # directions_out = triangle_centers - mesh_center
-    # dots = np.sum(triangle_normals * directions_out, axis=1)
-
-    # triangle_normals[dots < 0] *= -1
-
-    # print("Normales invertidas:", np.sum(dots < 0))
 
     # ============================================================
     # 3. GENERAR PUNTOS DESPLAZADOS D
@@ -205,7 +207,7 @@ def generar_puntos_de_vista(
         export_point_cloud(
             D,
             Path(output_dir) / "01_D_puntos_desplazados_filtrados.ply",
-            color=[1.0, 1.0, 0.0],
+            color=[1.0, 1.0, 0.0], # AMARILLO
             verbose=verbose
         )
 
@@ -253,7 +255,7 @@ def generar_puntos_de_vista(
         export_point_cloud(
             centroids_1,
             Path(output_dir) / "02_centroides_primera_fase.ply",
-            color=[0.0, 1.0, 0.0],
+            color=[0.0, 1.0, 0.0], # VERDE
             verbose=verbose
         )
 
@@ -287,7 +289,7 @@ def generar_puntos_de_vista(
         export_point_cloud(
             filtered_centroids,
             Path(output_dir) / "03_centroides_filtrados_distancia.ply",
-            color=[1.0, 0.0, 1.0],
+            color=[1.0, 0.0, 1.0], # MAGENTA
             verbose=verbose
         )
 
@@ -335,7 +337,7 @@ def generar_puntos_de_vista(
         export_point_cloud(
             final_viewpoints,
             Path(output_dir) / "04_viewpoints_finales.ply",
-            color=[1.0, 0.0, 0.0],
+            color=[1.0, 0.0, 0.0], # ROJO
             verbose=verbose
         )
 

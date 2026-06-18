@@ -1,15 +1,18 @@
+import os
+from pathlib import Path
 from generar_vistas import generar_puntos_de_vista
+from construir_grafo import construir_grafo_viewpoints_open3d
+from planificadores import aplicar_aco, obtener_ruta_coordenadas
+from utilidades import exportar_ruta_meshlab, visualizar_ruta_3d_con_mesh
 
-from planificador_aco import (
-    construir_grafo_viewpoints_open3d,
-    aplicar_aco,
-    obtener_ruta_coordenadas
-)
+escenario = 2
+mesh_path = f"escenarios/escenarios_test/escenario{escenario}_ply/escenario{escenario}.ply"
+output_dir = f"escenarios/escenarios_test/escenario{escenario}_ply"
+os.makedirs(output_dir, exist_ok=True)
 
-from exportar_ruta_meshlab import exportar_ruta_meshlab
+algoritmo = "ACO"
 
-mesh_path = "escenarios/escenarios_test/escenario2_ply/escenario2.ply"
-output_dir = "escenarios/escenarios_test/escenario2_ply"
+print("================== FASE 1: GENERACIÓN DE VISTAS ==================\n")
 
 viewpoints = generar_puntos_de_vista(
     mesh_path=mesh_path,
@@ -21,18 +24,20 @@ viewpoints = generar_puntos_de_vista(
     ground_margin=0.08,
     export_intermediate=True,
     output_dir=output_dir,
-    verbose=False
+    verbose=True
 )
 
-print("Viewpoints obtenidos en main:", viewpoints.shape)
-# print(viewpoints)
+print("\n================== FASE 2: CREACIÓN DEL GRAFO ==================\n")
 
 dist_matrix = construir_grafo_viewpoints_open3d(
     mesh_path=mesh_path,
     viewpoints=viewpoints,
-    k_vecinos=15, # con escenario1 k = 10 vale
+    # k_vecinos=10, # escenario 1
+    k_vecinos=15, # escenario 2
     verbose=True
 )
+
+print("\n================== FASE 3: PATH PLANNING ==================\n")
 
 # print(dist_matrix)
 mejor_camino, mejor_distancia = aplicar_aco(
@@ -44,27 +49,66 @@ mejor_camino, mejor_distancia = aplicar_aco(
     evaporacion=0.4,
     q=1.0,
     ciclo_cerrado=False,
-    seed=33,
+    seed=17,
     verbose=True
 )
 
 ruta_3d = obtener_ruta_coordenadas(viewpoints, mejor_camino)
 
-print("Mejor camino de índices:")
-print(mejor_camino)
+mejor_camino_limpio = [int(i) for i in mejor_camino]
 
-print("Mejor distancia total:")
-print(mejor_distancia)
+print("\nMejor camino de índices:")
+print(mejor_camino_limpio)
 
-print("Ruta 3D:")
-print(ruta_3d.shape)
+print("\nMejor distancia total:")
+print("└──", round(float(mejor_distancia), 4))
 
-camino_cerrado = mejor_camino + [mejor_camino[0]]
+print("\nRuta 3D (Shape):")
+print("└──", ruta_3d.shape)
 
 path_ruta = exportar_ruta_meshlab(
     viewpoints=viewpoints,
-    camino=camino_cerrado,
+    camino=mejor_camino,
     output_dir=output_dir,
-    nombre_ruta="ruta_aco_meshlab.ply",
-    radio_ruta=0.006
+    nombre_ruta=f"ruta_{algoritmo.lower()}_meshlab.ply",
+    radio_ruta=0.001
+)
+
+path_imagen = Path(output_dir) / f"ruta_{algoritmo.lower()}_sobre_escenario.png"
+
+# Guarda la imagen
+visualizar_ruta_3d_con_mesh(
+    mesh_path=mesh_path,
+    ruta_3d=ruta_3d,
+    titulo=f"Ruta {algoritmo} sobre escenario {escenario}",
+    algoritmo = algoritmo,
+    save_path=path_imagen,
+    max_triangulos=30000,
+    color_mesh="#d9d6cf",
+    color_ruta="crimson",
+    grosor_ruta=0.008,
+    radio_puntos=0.015,
+    radio_inicio_fin=0.02,
+    mostrar_ventana=False,
+    zoom=0.85
+)
+
+# Abre ventana para visualizar
+visualizar_ruta_3d_con_mesh(
+    mesh_path=mesh_path,
+    ruta_3d=ruta_3d,
+    titulo=f"Ruta {algoritmo} sobre escenario {escenario}",
+    algoritmo = algoritmo,
+    save_path=None,
+    max_triangulos=30000,
+    color_mesh="#c0b7a0",
+    color_ruta="crimson",
+    grosor_ruta=0.008,
+    radio_puntos=0.015,
+    radio_inicio_fin=0.02,
+    mostrar_ventana=True,
+    ventana=(950, 750),
+    posicion_ventana=(268, 20),
+    zoom=0.9,
+    elev=-8
 )
