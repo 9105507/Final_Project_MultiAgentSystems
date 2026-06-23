@@ -12,14 +12,40 @@ os.makedirs(output_dir, exist_ok=True)
 
 algoritmo = "ACO"
 
+if escenario == 1:
+    # ESCENARIO 1
+    parametros_escenario = {
+        "d_f": 0.15,
+        "R_1": 0.02,
+        "R_2": 0.06,
+        "k_vecinos": 10
+        # MAYBE OPTIMIZAR PARAMS ACO PARA CADA ESCENARIO
+    }
+else:
+    # ESCENARIO 2
+    parametros_escenario = {
+        "d_f": 0.15,
+        "R_1": 0.03,
+        "R_2": 0.07,
+        "k_vecinos": 15
+        # MAYBE OPTIMIZAR PARAMS ACO PARA CADA ESCENARIO
+    }
+    # MÁS VIEWPOINTS:
+    # parametros_escenario = {
+    #     "d_f": 0.15,
+    #     "R_1": 0.02,
+    #     "R_2": 0.05,
+    #     "k_vecinos": 15
+    # }
+
 print("================== FASE 1: GENERACIÓN DE VISTAS ==================\n")
 
 viewpoints = generar_puntos_de_vista(
     mesh_path=mesh_path,
-    d_f=0.15,                       # distancia de desplazamiento desde cada triángulo
-    R_1=0.02,                       # radio primer DBSCAN
+    d_f=parametros_escenario["d_f"],                       # distancia de desplazamiento desde cada triángulo
+    R_1=parametros_escenario["R_1"],                       # radio primer DBSCAN
     d_min=0.1,                      # distancia mínima a la malla
-    R_2=0.06,                       # radio segundo DBSCAN
+    R_2=parametros_escenario["R_2"],                       # radio segundo DBSCAN
     min_samples=1,                  # Mínimo de puntos por clúster
     ground_margin=0.08,
     export_intermediate=True,
@@ -32,14 +58,14 @@ print("\n================== FASE 2: CREACIÓN DEL GRAFO ==================\n")
 dist_matrix = construir_grafo_viewpoints_open3d(
     mesh_path=mesh_path,
     viewpoints=viewpoints,
-    # k_vecinos=10, # escenario 1
-    k_vecinos=15, # escenario 2
+    k_vecinos=parametros_escenario["k_vecinos"],
     verbose=True
 )
 
 print("\n================== FASE 3: PATH PLANNING ==================\n")
 
-# print(dist_matrix)
+ciclo_cerrado = False
+
 mejor_camino, mejor_distancia = aplicar_aco(
     dist_matrix=dist_matrix,
     n_hormigas=50,
@@ -48,7 +74,7 @@ mejor_camino, mejor_distancia = aplicar_aco(
     beta=4.0,
     evaporacion=0.4,
     q=1.0,
-    ciclo_cerrado=False,
+    ciclo_cerrado=ciclo_cerrado,
     seed=17,
     verbose=True
 )
@@ -74,7 +100,10 @@ path_ruta = exportar_ruta_meshlab(
     radio_ruta=0.001
 )
 
-path_imagen = Path(output_dir) / f"ruta_{algoritmo.lower()}_sobre_escenario.png"
+if ciclo_cerrado:
+    path_imagen = Path(output_dir) / f"ruta_{algoritmo.lower()}_TSP_Cerrado.png"
+else:
+    path_imagen = Path(output_dir) / f"ruta_{algoritmo.lower()}_TSP_Abierto.png"
 
 # Guarda la imagen
 visualizar_ruta_3d_con_mesh(
