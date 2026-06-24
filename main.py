@@ -2,15 +2,18 @@ import os
 from pathlib import Path
 from generar_vistas import generar_puntos_de_vista
 from construir_grafo import construir_grafo_viewpoints_open3d
-from planificadores import aplicar_aco, obtener_ruta_coordenadas
+from planificadores import obtener_ruta_coordenadas, aplicar_aco, aplicar_ga, aplicar_abc_discreto
 from utilidades import exportar_ruta_meshlab, visualizar_ruta_3d_con_mesh
 
+# algoritmo = "ACO"
+# algoritmo = "GA"
+algoritmo = "ABC"
+
+# escenario = 1
 escenario = 2
 mesh_path = f"escenarios/escenarios_test/escenario{escenario}_ply/escenario{escenario}.ply"
 output_dir = f"escenarios/escenarios_test/escenario{escenario}_ply"
 os.makedirs(output_dir, exist_ok=True)
-
-algoritmo = "ACO"
 
 if escenario == 1:
     # ESCENARIO 1
@@ -62,22 +65,47 @@ dist_matrix = construir_grafo_viewpoints_open3d(
     verbose=True
 )
 
-print("\n================== FASE 3: PATH PLANNING ==================\n")
+print(f"\n================== FASE 3: PATH PLANNING CON {algoritmo} ==================\n")
 
 ciclo_cerrado = False
 
-mejor_camino, mejor_distancia = aplicar_aco(
-    dist_matrix=dist_matrix,
-    n_hormigas=50,
-    n_iteraciones=200,
-    alpha=1.0,
-    beta=4.0,
-    evaporacion=0.4,
-    q=1.0,
-    ciclo_cerrado=ciclo_cerrado,
-    seed=17,
-    verbose=True
-)
+if algoritmo == "ACO":
+    mejor_camino, mejor_distancia = aplicar_aco(
+        dist_matrix=dist_matrix,
+        n_hormigas=50,
+        n_iteraciones=500,
+        alpha=1.0,
+        beta=3.5,
+        evaporacion=0.5,
+        q=1.0,
+        ciclo_cerrado=ciclo_cerrado,
+        seed=17,
+        verbose=True
+    )
+elif algoritmo == "GA":
+    mejor_camino, mejor_distancia = aplicar_ga(
+        dist_matrix=dist_matrix,
+        n_poblacion=100,
+        n_generaciones=3000,
+        prob_cruce=0.85,
+        prob_mutacion=0.25,
+        elite=2,
+        tam_torneo=3,
+        ciclo_cerrado=ciclo_cerrado,
+        seed=17,
+        verbose=True
+    )
+elif algoritmo == "ABC":
+    mejor_camino, mejor_distancia = aplicar_abc_discreto(
+        dist_matrix=dist_matrix,
+        n_fuentes=80,
+        n_iteraciones=500,
+        limite=20,
+        prob_2opt=0.30,
+        ciclo_cerrado=ciclo_cerrado,
+        seed=17,
+        verbose=True
+    )
 
 ruta_3d = obtener_ruta_coordenadas(viewpoints, mejor_camino)
 
