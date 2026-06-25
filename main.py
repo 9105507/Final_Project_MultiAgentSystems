@@ -1,16 +1,23 @@
 import os
 from pathlib import Path
+import pandas as pd
 from generar_vistas import generar_puntos_de_vista
 from construir_grafo import construir_grafo_viewpoints_open3d
-from planificadores import obtener_ruta_coordenadas, aplicar_aco, aplicar_ga, aplicar_abc_discreto
+from planificadores import (
+    aplicar_ant_system,
+    aplicar_elitist_ant_system,
+    aplicar_as_ranked,
+    aplicar_min_max_ant_system,
+    aplicar_ant_colony_system,
+    aplicar_simulated_annealing,
+    obtener_ruta_coordenadas
+)
 from utilidades import exportar_ruta_meshlab, visualizar_ruta_3d_con_mesh
 
-# algoritmo = "ACO"
-# algoritmo = "GA"
-algoritmo = "ABC"
+# Opciones: "ACO_AS", "ACO_EAS", "ACO_AS_RANK", "ACO_MMAS", "ACO_ACS" y "SA"
+algoritmo = "SA"
 
-# escenario = 1
-escenario = 2
+escenario = 1
 mesh_path = f"escenarios/escenarios_test/escenario{escenario}_ply/escenario{escenario}.ply"
 output_dir = f"escenarios/escenarios_test/escenario{escenario}_ply"
 os.makedirs(output_dir, exist_ok=True)
@@ -20,26 +27,17 @@ if escenario == 1:
     parametros_escenario = {
         "d_f": 0.15,
         "R_1": 0.02,
-        "R_2": 0.06,
-        "k_vecinos": 10
-        # MAYBE OPTIMIZAR PARAMS ACO PARA CADA ESCENARIO
+        "R_2": 0.05,
+        "k_vecinos": 20
     }
 else:
     # ESCENARIO 2
     parametros_escenario = {
         "d_f": 0.15,
-        "R_1": 0.03,
+        "R_1": 0.02,
         "R_2": 0.07,
-        "k_vecinos": 15
-        # MAYBE OPTIMIZAR PARAMS ACO PARA CADA ESCENARIO
+        "k_vecinos": 20
     }
-    # MÁS VIEWPOINTS:
-    # parametros_escenario = {
-    #     "d_f": 0.15,
-    #     "R_1": 0.02,
-    #     "R_2": 0.05,
-    #     "k_vecinos": 15
-    # }
 
 print("================== FASE 1: GENERACIÓN DE VISTAS ==================\n")
 
@@ -68,44 +66,111 @@ dist_matrix = construir_grafo_viewpoints_open3d(
 print(f"\n================== FASE 3: PATH PLANNING CON {algoritmo} ==================\n")
 
 ciclo_cerrado = False
+n_nodos = dist_matrix.shape[0]
 
-if algoritmo == "ACO":
-    mejor_camino, mejor_distancia = aplicar_aco(
+if algoritmo == "ACO_AS":
+    mejor_camino, mejor_distancia, historial = aplicar_ant_system(
         dist_matrix=dist_matrix,
-        n_hormigas=50,
-        n_iteraciones=500,
+        n_hormigas=n_nodos,
+        n_iteraciones=100,
         alpha=1.0,
-        beta=3.5,
+        beta=4.0,
         evaporacion=0.5,
         q=1.0,
+        tau0=None,
         ciclo_cerrado=ciclo_cerrado,
         seed=17,
-        verbose=True
+        verbose=True,
+        aplicar_2opt=False
     )
-elif algoritmo == "GA":
-    mejor_camino, mejor_distancia = aplicar_ga(
+elif algoritmo == "ACO_EAS":
+    mejor_camino, mejor_distancia, historial = aplicar_elitist_ant_system(
         dist_matrix=dist_matrix,
-        n_poblacion=100,
-        n_generaciones=3000,
-        prob_cruce=0.85,
-        prob_mutacion=0.25,
-        elite=2,
-        tam_torneo=3,
+        n_hormigas=n_nodos,
+        n_iteraciones=100,
+        alpha=1.0,
+        beta=4.0,
+        evaporacion=0.5,
+        q=1.0,
+        tau0=None,
+        peso_elite=n_nodos,
         ciclo_cerrado=ciclo_cerrado,
         seed=17,
-        verbose=True
+        verbose=True,
+        aplicar_2opt=False
     )
-elif algoritmo == "ABC":
-    mejor_camino, mejor_distancia = aplicar_abc_discreto(
+elif algoritmo == "ACO_AS_RANK":
+    mejor_camino, mejor_distancia, historial = aplicar_as_ranked(
         dist_matrix=dist_matrix,
-        n_fuentes=80,
-        n_iteraciones=500,
-        limite=20,
-        prob_2opt=0.30,
+        n_hormigas=n_nodos,
+        n_iteraciones=100,
+        alpha=1.0,
+        beta=4.0,
+        evaporacion=0.1,
+        q=1.0,
+        tau0=None,
+        w_rank=6,
         ciclo_cerrado=ciclo_cerrado,
         seed=17,
-        verbose=True
+        verbose=True,
+        aplicar_2opt=False
     )
+elif algoritmo == "ACO_MMAS":
+    mejor_camino, mejor_distancia, historial = aplicar_min_max_ant_system(
+        dist_matrix=dist_matrix,
+        n_hormigas=n_nodos,
+        n_iteraciones=100,
+        alpha=1.0,
+        beta=4.0,
+        evaporacion=0.02,
+        q=1.0,
+        tau0=None,
+        tau_min=None,
+        tau_max=None,
+        mmas_usar_mejor_global=True,
+        ciclo_cerrado=ciclo_cerrado,
+        seed=17,
+        verbose=True,
+        aplicar_2opt=False
+    )
+elif algoritmo == "ACO_ACS":
+    mejor_camino, mejor_distancia, historial = aplicar_ant_colony_system(
+        dist_matrix=dist_matrix,
+        n_hormigas=10,
+        n_iteraciones=100,
+        alpha=1.0,
+        beta=4.0,
+        evaporacion=0.1,
+        q=1.0,
+        tau0=None,
+        phi=0.1,
+        q0=0.9,
+        acs_usar_mejor_global=True,
+        ciclo_cerrado=ciclo_cerrado,
+        seed=17,
+        verbose=True,
+        aplicar_2opt=False
+    )
+elif algoritmo == "SA":
+    mejor_camino, mejor_distancia, historial = aplicar_simulated_annealing(
+        dist_matrix=dist_matrix,
+        n_iteraciones=10000,
+        temperatura_inicial=None,
+        temperatura_final=1e-4,
+        enfriamiento=0.995,
+        ciclo_cerrado=ciclo_cerrado,
+        seed=17,
+        verbose=True,
+        max_intentos_inicial=1000,
+        max_intentos_vecino=50
+    )
+
+df_historial = pd.DataFrame(historial)
+
+path_historial = Path(output_dir) / f"historial_{algoritmo.lower()}.csv"
+df_historial.to_csv(path_historial, index=False)
+
+print(f"\n└──Historial guardado en: {path_historial}")
 
 ruta_3d = obtener_ruta_coordenadas(viewpoints, mejor_camino)
 

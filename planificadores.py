@@ -1,4 +1,5 @@
 import numpy as np
+import time
 
 def obtener_ruta_coordenadas(viewpoints, camino):
     """
@@ -87,224 +88,6 @@ def comprobar_conectividad(dist_matrix):
 
     return len(visitados) == n, visitados
 
-def aplicar_aco(
-    dist_matrix,
-    n_hormigas=40,
-    n_iteraciones=150,
-    alpha=1.0,
-    beta=4.0,
-    evaporacion=0.4,
-    q=1.0,
-    ciclo_cerrado=False,
-    seed=17,
-    verbose=True
-):
-    """
-    Aplica el algoritmo Ant Colony Optimization sobre un grafo de viewpoints.
-
-    La función busca una ruta de bajo coste que visite todos los nodos del grafo
-    representado mediante una matriz de distancias. Cada nodo corresponde a un
-    viewpoint y cada arista válida representa una conexión directa posible entre
-    dos viewpoints.
-
-    El algoritmo simula el comportamiento de varias hormigas artificiales. Cada
-    hormiga construye una ruta seleccionando probabilísticamente el siguiente
-    nodo a visitar en función de dos factores: la cantidad de feromona acumulada
-    en la arista y la heurística asociada a la distancia. Las aristas más cortas
-    y con más feromona tienen mayor probabilidad de ser elegidas.
-
-    Al final de cada iteración, las feromonas se evaporan parcialmente y las
-    rutas válidas depositan nueva feromona en las aristas utilizadas. De esta
-    forma, las mejores rutas tienden a reforzarse progresivamente durante el
-    proceso de búsqueda.
-
-    Parámetros
-    ----------
-    dist_matrix : np.ndarray de shape (N, N)
-        Matriz de distancias del grafo. La posición dist_matrix[i, j] contiene
-        la distancia entre los nodos i y j si existe conexión directa. Si no hay
-        conexión, contiene np.inf. La diagonal principal contiene ceros.
-
-    n_hormigas : int, opcional
-        Número de hormigas artificiales utilizadas en cada iteración. Un valor
-        mayor permite explorar más rutas por iteración, aunque aumenta el coste
-        computacional. Por defecto es 40.
-
-    n_iteraciones : int, opcional
-        Número total de iteraciones del algoritmo. A mayor número de iteraciones,
-        mayor oportunidad de mejorar la solución, aunque también aumenta el
-        tiempo de ejecución. Por defecto es 150.
-
-    alpha : float, opcional
-        Peso de la feromona en la decisión de cada hormiga. Valores altos hacen
-        que las hormigas tiendan a seguir más intensamente las aristas ya
-        reforzadas por soluciones anteriores. Por defecto es 1.0.
-
-    beta : float, opcional
-        Peso de la heurística basada en la distancia. Valores altos hacen que
-        las hormigas prioricen más las conexiones cortas. Por defecto es 4.0.
-
-    evaporacion : float, opcional
-        Tasa de evaporación de feromonas en cada iteración. Debe estar entre
-        0.0 y 1.0. Valores altos reducen más rápido la influencia de rutas
-        anteriores, favoreciendo la exploración. Por defecto es 0.4.
-
-    q : float, opcional
-        Factor de depósito de feromona. Controla la cantidad de feromona añadida
-        por cada ruta válida. El depósito aplicado es q / distancia_total.
-        Por defecto es 1.0.
-
-    ciclo_cerrado : bool, opcional
-        Si es True, la ruta debe volver al nodo inicial al finalizar el recorrido,
-        formando un ciclo cerrado. Si es False, la ruta termina en el último nodo
-        visitado sin regresar al inicio. Por defecto es False.
-
-    seed : int, opcional
-        Semilla utilizada para inicializar el generador aleatorio de NumPy.
-        Permite obtener resultados reproducibles. Por defecto es 17.
-
-    verbose : bool, opcional
-        Si es True, muestra por consola el progreso del algoritmo cada 10
-        iteraciones, incluyendo la mejor distancia encontrada hasta el momento.
-        Por defecto es True.
-
-    Retorna
-    -------
-    mejor_camino : list de int
-        Lista de índices que representa el mejor camino encontrado. Cada índice
-        corresponde a un viewpoint. Si ciclo_cerrado es True, el primer nodo
-        aparece también al final de la lista.
-
-    mejor_distancia : float
-        Distancia total asociada al mejor camino encontrado.
-
-    Lanza
-    -----
-    ValueError
-        Si el grafo no es conexo, es decir, si no todos los nodos son alcanzables
-        desde el nodo inicial. En ese caso, no es posible construir una ruta que
-        visite todos los viewpoints.
-
-    Notas
-    -----
-    Antes de ejecutar el algoritmo, se comprueba que el grafo sea conexo mediante
-    la función comprobar_conectividad(). Si el grafo no es conexo, se recomienda
-    aumentar el número de vecinos usados al construir el grafo o generar más
-    puntos intermedios.
-
-    La heurística utilizada es la inversa de la distancia: 1 / distancia. Por
-    tanto, las aristas más cortas tienen un valor heurístico mayor.
-
-    Las aristas inexistentes se representan con np.inf y no participan en la
-    selección de candidatos ni en la actualización de feromonas.
-
-    Esta implementación resuelve una variante del problema de visitar todos los
-    viewpoints. Si ciclo_cerrado es False, se obtiene una ruta abierta. Si
-    ciclo_cerrado es True, se obtiene una ruta cerrada similar al problema del
-    viajante.
-    """
-    rng = np.random.default_rng(seed)
-
-    n = dist_matrix.shape[0]
-
-    conectado, visitados = comprobar_conectividad(dist_matrix)
-
-    if not conectado:
-        raise ValueError(
-            f"El grafo no es conexo. Solo se alcanzan {len(visitados)} de {n} nodos. "
-            f"Prueba a aumentar k_vecinos o a generar más puntos intermedios."
-        )
-
-    mascara_aristas = np.isfinite(dist_matrix) & (dist_matrix > 0)
-
-    heuristica = np.zeros_like(dist_matrix)
-    heuristica[mascara_aristas] = 1.0 / dist_matrix[mascara_aristas]
-
-    feromonas = np.zeros_like(dist_matrix)
-    feromonas[mascara_aristas] = 1.0
-
-    mejor_camino = None
-    mejor_distancia = np.inf
-
-    for it in range(n_iteraciones):
-        caminos_iteracion = []
-
-        for _ in range(n_hormigas):
-            inicio = rng.integers(0, n)
-
-            camino = [inicio]
-            no_visitados = set(range(n))
-            no_visitados.remove(inicio)
-
-            actual = inicio
-            distancia_total = 0.0
-            valido = True
-
-            while no_visitados:
-                candidatos = [
-                    j for j in no_visitados
-                    if np.isfinite(dist_matrix[actual, j])
-                ]
-
-                if len(candidatos) == 0:
-                    valido = False
-                    break
-
-                valores = []
-
-                for j in candidatos:
-                    tau = feromonas[actual, j] ** alpha
-                    eta = heuristica[actual, j] ** beta
-                    valores.append(tau * eta)
-
-                valores = np.asarray(valores, dtype=float)
-
-                if valores.sum() == 0:
-                    probabilidades = np.ones(len(candidatos)) / len(candidatos)
-                else:
-                    probabilidades = valores / valores.sum()
-
-                siguiente = rng.choice(candidatos, p=probabilidades)
-
-                distancia_total += dist_matrix[actual, siguiente]
-                camino.append(siguiente)
-                no_visitados.remove(siguiente)
-
-                actual = siguiente
-
-            if valido and ciclo_cerrado:
-                inicio = camino[0]
-
-                if np.isfinite(dist_matrix[actual, inicio]):
-                    distancia_total += dist_matrix[actual, inicio]
-                    camino.append(inicio)
-                else:
-                    valido = False
-
-            if valido:
-                caminos_iteracion.append((camino, distancia_total))
-
-                if distancia_total < mejor_distancia:
-                    mejor_distancia = distancia_total
-                    mejor_camino = camino
-
-        feromonas *= (1.0 - evaporacion)
-
-        for camino, distancia in caminos_iteracion:
-            deposito = q / distancia
-
-            for a, b in zip(camino[:-1], camino[1:]):
-                feromonas[a, b] += deposito
-                feromonas[b, a] += deposito
-
-        if verbose and (it + 1) % 10 == 0:
-            print(
-                f"Iteración {it + 1}/{n_iteraciones} | "
-                f"Mejor distancia: {mejor_distancia:.4f}"
-            )
-
-    return mejor_camino, mejor_distancia
-
 def calcular_distancia_camino(dist_matrix, camino, ciclo_cerrado=False):
     """
     Calcula la distancia total de un camino sobre un grafo de viewpoints.
@@ -363,269 +146,26 @@ def calcular_distancia_camino(dist_matrix, camino, ciclo_cerrado=False):
 
     return distancia
 
-def crear_camino_greedy_aleatorio(dist_matrix, rng, max_intentos=200):
-    """
-    Crea una ruta inicial intentando seguir conexiones válidas.
-    Si no consigue una ruta completamente válida, devuelve la mejor parcial
-    completada aleatoriamente.
-    """
-    n = dist_matrix.shape[0]
-
-    mejor_camino = None
-    mejor_visitados = -1
-
-    for _ in range(max_intentos):
-        inicio = rng.integers(0, n)
-        camino = [inicio]
-
-        no_visitados = set(range(n))
-        no_visitados.remove(inicio)
-
-        actual = inicio
-        valido = True
-
-        while no_visitados:
-            candidatos = [
-                j for j in no_visitados
-                if np.isfinite(dist_matrix[actual, j])
-            ]
-
-            if len(candidatos) == 0:
-                valido = False
-                break
-
-            distancias = np.array([dist_matrix[actual, j] for j in candidatos])
-            pesos = 1.0 / (distancias + 1e-12)
-            probabilidades = pesos / pesos.sum()
-
-            siguiente = rng.choice(candidatos, p=probabilidades)
-
-            camino.append(siguiente)
-            no_visitados.remove(siguiente)
-            actual = siguiente
-
-        if valido:
-            return camino
-
-        if len(camino) > mejor_visitados:
-            mejor_visitados = len(camino)
-            mejor_camino = camino.copy()
-
-    restantes = [i for i in range(n) if i not in mejor_camino]
-    rng.shuffle(restantes)
-
-    return mejor_camino + restantes
-
-def aplicar_ga(
+def aplicar_simulated_annealing(
     dist_matrix,
-    n_poblacion=60,
-    n_generaciones=200,
-    prob_cruce=0.85,
-    prob_mutacion=0.25,
-    elite=2,
-    tam_torneo=3,
+    n_iteraciones=10000,
+    temperatura_inicial=None,
+    temperatura_final=1e-4,
+    enfriamiento=0.995,
     ciclo_cerrado=False,
     seed=17,
-    verbose=True
+    verbose=True,
+    max_intentos_inicial=500,
+    max_intentos_vecino=30
 ):
     """
-    Aplica un Algoritmo Genético para resolver una variante abierta o cerrada
-    del TSP sobre un grafo representado mediante una matriz de distancias.
+    Aplica Simulated Annealing para resolver una variante abierta o cerrada
+    del TSP sobre un grafo representado mediante matriz de distancias.
 
-    Cada individuo representa una ruta como una permutación de nodos. El objetivo
-    es encontrar el orden de visita que minimiza la distancia total recorrida.
-
-    Parámetros
-    ----------
-    dist_matrix : np.ndarray
-        Matriz de distancias del grafo. Las aristas no válidas deben estar
-        representadas con np.inf.
-
-    n_poblacion : int
-        Número de individuos de la población.
-
-    n_generaciones : int
-        Número de generaciones del algoritmo.
-
-    prob_cruce : float
-        Probabilidad de aplicar cruce entre dos padres.
-
-    prob_mutacion : float
-        Probabilidad de aplicar mutación a un individuo.
-
-    elite : int
-        Número de mejores individuos que pasan directamente a la siguiente
-        generación.
-
-    tam_torneo : int
-        Tamaño del torneo usado para seleccionar padres.
-
-    ciclo_cerrado : bool
-        Si es True, la ruta vuelve al nodo inicial. Si es False, la ruta es abierta.
-
-    seed : int
-        Semilla para reproducibilidad.
-
-    verbose : bool
-        Si es True, muestra el progreso cada 10 generaciones.
-
-    Retorna
-    -------
-    mejor_camino : list de int
-        Mejor ruta encontrada.
-
-    mejor_distancia : float
-        Distancia total de la mejor ruta.
-    """
-
-    rng = np.random.default_rng(seed)
-
-    n = dist_matrix.shape[0]
-
-    conectado, visitados = comprobar_conectividad(dist_matrix)
-
-    if not conectado:
-        raise ValueError(
-            f"El grafo no es conexo. Solo se alcanzan {len(visitados)} de {n} nodos. "
-            f"Prueba a aumentar k_vecinos o a generar más puntos intermedios."
-        )
-
-    def evaluar(individuo):
-        return calcular_distancia_camino(
-            dist_matrix,
-            individuo,
-            ciclo_cerrado=ciclo_cerrado
-        )
-
-    def seleccionar_torneo(poblacion, distancias):
-        """
-        Selecciona un individuo mediante torneo.
-        """
-        indices = rng.choice(len(poblacion), size=tam_torneo, replace=False)
-        mejor_idx = indices[np.argmin([distancias[i] for i in indices])]
-        return poblacion[mejor_idx].copy()
-
-    def cruce_ox(padre1, padre2):
-        """
-        Order Crossover (OX), adecuado para permutaciones.
-        Mantiene un segmento del padre1 y completa con el orden del padre2.
-        """
-        size = len(padre1)
-
-        i, j = sorted(rng.choice(size, size=2, replace=False))
-
-        hijo = [-1] * size
-        hijo[i:j + 1] = padre1[i:j + 1]
-
-        pos = (j + 1) % size
-
-        for gen in padre2:
-            if gen not in hijo:
-                hijo[pos] = gen
-                pos = (pos + 1) % size
-
-        return hijo
-
-    def mutar(individuo):
-        """
-        Aplica una mutación aleatoria sobre la ruta.
-        Usa swap, inserción o inversión de subsecuencia.
-        """
-        individuo = individuo.copy()
-        tipo = rng.choice(["swap", "insert", "reverse"])
-
-        i, j = sorted(rng.choice(len(individuo), size=2, replace=False))
-
-        if tipo == "swap":
-            individuo[i], individuo[j] = individuo[j], individuo[i]
-
-        elif tipo == "insert":
-            nodo = individuo.pop(j)
-            individuo.insert(i, nodo)
-
-        elif tipo == "reverse":
-            individuo[i:j + 1] = reversed(individuo[i:j + 1])
-
-        return individuo
-
-    # ------------------------------------------------------------
-    # Inicialización de población
-    # ------------------------------------------------------------
-    poblacion = [crear_camino_greedy_aleatorio(dist_matrix, rng) for _ in range(n_poblacion)]
-
-    mejor_camino = None
-    mejor_distancia = np.inf
-
-    # ------------------------------------------------------------
-    # Bucle principal
-    # ------------------------------------------------------------
-    for gen in range(n_generaciones):
-        distancias = np.array([evaluar(ind) for ind in poblacion])
-        validos = np.sum(np.isfinite(distancias))
-
-        idx_mejor = np.argmin(distancias)
-
-        if distancias[idx_mejor] < mejor_distancia:
-            mejor_distancia = distancias[idx_mejor]
-            mejor_camino = poblacion[idx_mejor].copy()
-
-        # Ordenar población por calidad
-        indices_ordenados = np.argsort(distancias)
-
-        nueva_poblacion = []
-
-        # Elitismo
-        for idx in indices_ordenados[:elite]:
-            nueva_poblacion.append(poblacion[idx].copy())
-
-        # Generar nuevos individuos
-        while len(nueva_poblacion) < n_poblacion:
-            padre1 = seleccionar_torneo(poblacion, distancias)
-            padre2 = seleccionar_torneo(poblacion, distancias)
-
-            if rng.random() < prob_cruce:
-                hijo = cruce_ox(padre1, padre2)
-            else:
-                hijo = padre1.copy()
-
-            if rng.random() < prob_mutacion:
-                hijo = mutar(hijo)
-
-            nueva_poblacion.append(hijo)
-
-        poblacion = nueva_poblacion
-
-        if verbose and (gen + 1) % 10 == 0:
-            print(
-                f"Generación {gen + 1}/{n_generaciones} | "
-                f"Mejor distancia: {mejor_distancia:.4f}"# | "
-                # f"Rutas válidas: {validos}/{n_poblacion}"
-            )
-
-    return mejor_camino, mejor_distancia
-
-def aplicar_abc_discreto(
-    dist_matrix,
-    n_fuentes=50,
-    n_iteraciones=300,
-    limite=40,
-    prob_2opt=0.25,
-    ciclo_cerrado=False,
-    seed=17,
-    verbose=True
-):
-    """
-    Aplica Artificial Bee Colony discreto para resolver una variante abierta
-    o cerrada del TSP sobre un grafo representado mediante matriz de distancias.
-
-    Cada fuente de alimento representa una ruta completa, codificada como una
-    permutación de nodos. La calidad de cada fuente se evalúa mediante la
-    distancia total del camino.
-
-    El algoritmo utiliza tres fases:
-    1. Abejas empleadas: exploran vecinos de sus fuentes actuales.
-    2. Abejas observadoras: seleccionan mejores fuentes y exploran sus vecinos.
-    3. Abejas exploradoras: sustituyen fuentes estancadas por nuevas rutas.
+    Cada solución es una permutación de nodos. En cada iteración se genera
+    una solución vecina mediante operadores discretos como swap, insert o
+    reverse. Si el vecino mejora, se acepta. Si empeora, puede aceptarse con
+    una probabilidad decreciente según la temperatura.
 
     Parámetros
     ----------
@@ -633,34 +173,43 @@ def aplicar_abc_discreto(
         Matriz de distancias del grafo. Las aristas inexistentes deben estar
         representadas con np.inf.
 
-    n_fuentes : int
-        Número de fuentes de alimento, equivalente al tamaño de población.
-
     n_iteraciones : int
-        Número total de iteraciones del algoritmo.
+        Número máximo de iteraciones del algoritmo.
 
-    limite : int
-        Número máximo de intentos sin mejora antes de abandonar una fuente.
+    temperatura_inicial : float o None
+        Temperatura inicial. Si es None, se estima automáticamente a partir
+        de distancias finitas del grafo.
 
-    prob_2opt : float
-        Probabilidad de aplicar un movimiento tipo 2-opt como operador local.
+    temperatura_final : float
+        Temperatura mínima. Si se alcanza, el algoritmo se detiene.
+
+    enfriamiento : float
+        Factor de enfriamiento multiplicativo. Debe estar entre 0 y 1.
 
     ciclo_cerrado : bool
-        Si es True, la ruta vuelve al nodo inicial. Si es False, la ruta es abierta.
+        Si es True, la ruta vuelve al nodo inicial. Si es False, se resuelve
+        como TSP abierto.
 
     seed : int
         Semilla para reproducibilidad.
 
     verbose : bool
-        Si es True, muestra progreso cada 10 iteraciones.
+        Si es True, muestra progreso cada cierto número de iteraciones.
+
+    max_intentos_inicial : int
+        Número máximo de intentos para generar una ruta inicial válida.
+
+    max_intentos_vecino : int
+        Número máximo de intentos para generar un vecino válido antes de
+        conservar la solución actual.
 
     Retorna
     -------
     mejor_camino : list de int
-        Mejor ruta encontrada.
+        Mejor camino encontrado.
 
     mejor_distancia : float
-        Distancia total de la mejor ruta.
+        Distancia total del mejor camino.
     """
 
     rng = np.random.default_rng(seed)
@@ -682,129 +231,1094 @@ def aplicar_abc_discreto(
             ciclo_cerrado=ciclo_cerrado
         )
 
+    def crear_camino_greedy_valido():
+        """
+        Intenta construir una ruta válida siguiendo conexiones existentes.
+        Si no encuentra una ruta completa válida tras varios intentos,
+        devuelve None.
+        """
+        for _ in range(max_intentos_inicial):
+            inicio = int(rng.integers(0, n))
+
+            camino = [inicio]
+            no_visitados = set(range(n))
+            no_visitados.remove(inicio)
+
+            actual = inicio
+            valido = True
+
+            while no_visitados:
+                candidatos = [
+                    j for j in no_visitados
+                    if np.isfinite(dist_matrix[actual, j])
+                ]
+
+                if len(candidatos) == 0:
+                    valido = False
+                    break
+
+                distancias = np.array(
+                    [dist_matrix[actual, j] for j in candidatos],
+                    dtype=float
+                )
+
+                pesos = 1.0 / (distancias + 1e-12)
+                probabilidades = pesos / pesos.sum()
+
+                siguiente = int(rng.choice(candidatos, p=probabilidades))
+
+                camino.append(siguiente)
+                no_visitados.remove(siguiente)
+                actual = siguiente
+
+            if valido:
+                distancia = evaluar(camino)
+
+                if np.isfinite(distancia):
+                    return camino, distancia
+
+        return None, np.inf
+
     def generar_vecino(camino):
         """
-        Genera una ruta vecina mediante operadores discretos:
-        swap, insert, reverse o 2-opt.
+        Genera un vecino mediante un movimiento discreto.
         """
         vecino = camino.copy()
 
-        if len(vecino) < 3:
+        if ciclo_cerrado and len(vecino) > 1 and vecino[0] == vecino[-1]:
+            base = vecino[:-1]
+        else:
+            base = vecino.copy()
+
+        if len(base) < 3:
             return vecino
 
-        if rng.random() < prob_2opt:
-            tipo = "2opt"
-        else:
-            tipo = rng.choice(["swap", "insert", "reverse"])
+        tipo = rng.choice(["swap", "insert", "reverse"])
 
-        i, j = sorted(rng.choice(len(vecino), size=2, replace=False))
+        i, j = sorted(rng.choice(len(base), size=2, replace=False))
 
         if tipo == "swap":
-            vecino[i], vecino[j] = vecino[j], vecino[i]
+            base[i], base[j] = base[j], base[i]
 
         elif tipo == "insert":
-            nodo = vecino.pop(j)
-            vecino.insert(i, nodo)
+            nodo = base.pop(j)
+            base.insert(i, nodo)
 
         elif tipo == "reverse":
-            vecino[i:j + 1] = reversed(vecino[i:j + 1])
+            base[i:j + 1] = reversed(base[i:j + 1])
 
-        elif tipo == "2opt":
-            vecino[i:j + 1] = reversed(vecino[i:j + 1])
+        if ciclo_cerrado:
+            return base + [base[0]]
 
-        return vecino
-
-    def fitness_desde_distancia(distancia):
-        """
-        Convierte una distancia en fitness positivo.
-        Las rutas inválidas reciben fitness 0.
-        """
-        if not np.isfinite(distancia):
-            return 0.0
-
-        return 1.0 / (1.0 + distancia)
+        return base
 
     # ------------------------------------------------------------
-    # Inicialización
+    # Solución inicial
     # ------------------------------------------------------------
-    fuentes = [crear_camino_greedy_aleatorio(dist_matrix, rng) for _ in range(n_fuentes)]
-    distancias = np.array([evaluar(fuente) for fuente in fuentes], dtype=float)
-    intentos_sin_mejora = np.zeros(n_fuentes, dtype=int)
+    camino_actual, distancia_actual = crear_camino_greedy_valido()
 
-    idx_mejor = np.argmin(distancias)
-    mejor_camino = fuentes[idx_mejor].copy()
-    mejor_distancia = distancias[idx_mejor]
-
-    # ------------------------------------------------------------
-    # Bucle principal ABC
-    # ------------------------------------------------------------
-    for it in range(n_iteraciones):
-
-        # ========================================================
-        # 1. FASE DE ABEJAS EMPLEADAS
-        # ========================================================
-        for i in range(n_fuentes):
-            candidata = generar_vecino(fuentes[i])
-            distancia_candidata = evaluar(candidata)
-
-            if distancia_candidata < distancias[i]:
-                fuentes[i] = candidata
-                distancias[i] = distancia_candidata
-                intentos_sin_mejora[i] = 0
-            else:
-                intentos_sin_mejora[i] += 1
-
-        # ========================================================
-        # 2. FASE DE ABEJAS OBSERVADORAS
-        # ========================================================
-        fitness = np.array(
-            [fitness_desde_distancia(d) for d in distancias],
-            dtype=float
+    if camino_actual is None or not np.isfinite(distancia_actual):
+        raise ValueError(
+            "No se ha podido generar una ruta inicial válida para Simulated Annealing. "
+            "Prueba a aumentar k_vecinos o max_intentos_inicial."
         )
 
-        if fitness.sum() == 0:
-            probabilidades = np.ones(n_fuentes) / n_fuentes
+    mejor_camino = camino_actual.copy()
+    mejor_distancia = distancia_actual
+
+    # ------------------------------------------------------------
+    # Temperatura inicial automática
+    # ------------------------------------------------------------
+    if temperatura_inicial is None:
+        valores_finitos = dist_matrix[
+            np.isfinite(dist_matrix) & (dist_matrix > 0)
+        ]
+
+        if len(valores_finitos) == 0:
+            raise ValueError("No hay aristas válidas en la matriz de distancias.")
+
+        temperatura = float(np.mean(valores_finitos) * n)
+    else:
+        temperatura = float(temperatura_inicial)
+
+    if temperatura <= 0:
+        raise ValueError("La temperatura inicial debe ser positiva.")
+
+    if not (0 < enfriamiento < 1):
+        raise ValueError("El enfriamiento debe estar entre 0 y 1.")
+
+    # ------------------------------------------------------------
+    # Bucle principal
+    # ------------------------------------------------------------
+    aceptadas = 0
+
+    historial = []
+    tiempo_inicio_total = time.perf_counter()
+
+    for it in range(n_iteraciones):
+        tiempo_inicio_iteracion = time.perf_counter()
+
+        vecino = None
+        distancia_vecino = np.inf
+        aceptada_iteracion = False
+
+        # Intentamos generar un vecino válido
+        for _ in range(max_intentos_vecino):
+            candidato = generar_vecino(camino_actual)
+            d = evaluar(candidato)
+
+            if np.isfinite(d):
+                vecino = candidato
+                distancia_vecino = d
+                break
+
+        # Si no se ha conseguido vecino válido, enfriamos y seguimos
+        if vecino is None:
+            temperatura *= enfriamiento
+
+            if temperatura < temperatura_final:
+                break
+
+            continue
+
+        diferencia = distancia_vecino - distancia_actual
+
+        aceptar = False
+
+        if diferencia < 0:
+            aceptar = True
         else:
-            probabilidades = fitness / fitness.sum()
+            probabilidad = np.exp(-diferencia / temperatura)
+            aceptar = rng.random() < probabilidad
 
-        for _ in range(n_fuentes):
-            i = rng.choice(np.arange(n_fuentes), p=probabilidades)
+        if aceptar:
+            camino_actual = vecino
+            distancia_actual = distancia_vecino
+            aceptadas += 1
 
-            candidata = generar_vecino(fuentes[i])
-            distancia_candidata = evaluar(candidata)
+            if distancia_actual < mejor_distancia:
+                mejor_distancia = distancia_actual
+                mejor_camino = camino_actual.copy()
 
-            if distancia_candidata < distancias[i]:
-                fuentes[i] = candidata
-                distancias[i] = distancia_candidata
-                intentos_sin_mejora[i] = 0
+        temperatura *= enfriamiento
+
+        tiempo_iteracion = time.perf_counter() - tiempo_inicio_iteracion
+        tiempo_total = time.perf_counter() - tiempo_inicio_total
+
+        historial.append({
+            "algoritmo": "SA",
+            "iteracion": it + 1,
+            "mejor_distancia_global": float(mejor_distancia),
+            "distancia_actual": float(distancia_actual),
+            "distancia_vecino": float(distancia_vecino),
+            "temperatura": float(temperatura),
+            "aceptadas": int(aceptadas),
+            "aceptada_iteracion": bool(aceptada_iteracion),
+            "tiempo_iteracion": float(tiempo_iteracion),
+            "tiempo_total": float(tiempo_total)
+        })
+
+        if verbose and (it + 1) % 500 == 0:
+            print(
+                f"Iteración {it + 1}/{n_iteraciones} | "
+                f"Mejor distancia: {mejor_distancia:.4f} | "
+                f"Actual: {distancia_actual:.4f} | "
+                f"Temperatura: {temperatura:.6f} | "
+                f"Aceptadas: {aceptadas} | "
+                f"Tiempo iteración: {tiempo_iteracion:.4f}s"
+            )
+
+        if temperatura < temperatura_final:
+            if verbose:
+                print(
+                    f"Parada por temperatura mínima en iteración {it + 1}. "
+                    f"Mejor distancia: {mejor_distancia:.4f}"
+                )
+            break
+
+    if mejor_camino is None or not np.isfinite(mejor_distancia):
+        raise ValueError(
+            "Simulated Annealing no ha encontrado ninguna ruta válida."
+        )
+
+    return mejor_camino, mejor_distancia, historial
+
+def aplicar_aco_variante(
+    dist_matrix,
+    variante="AS",
+    n_hormigas=None,
+    n_iteraciones=200,
+    alpha=1.0,
+    beta=4.0,
+    evaporacion=None,
+    q=1.0,
+    tau0=None,
+    ciclo_cerrado=False,
+    seed=17,
+    verbose=True,
+
+    # Parámetros específicos EAS
+    peso_elite=None,
+
+    # Parámetros específicos ASrank
+    w_rank=6,
+
+    # Parámetros específicos MMAS
+    tau_min=None,
+    tau_max=None,
+    mmas_usar_mejor_global=True,
+
+    # Parámetros específicos ACS
+    phi=0.1,
+    q0=0.9,
+    acs_usar_mejor_global=True,
+
+    # Búsqueda local opcional
+    aplicar_2opt=False,
+    n_intentos_2opt=80
+):
+    """
+    Aplica diferentes variantes de Ant Colony Optimization para resolver una
+    variante abierta o cerrada del TSP sobre un grafo representado mediante una
+    matriz de distancias.
+
+    Variantes disponibles
+    ---------------------
+    "AS"     : Ant System.
+    "EAS"    : Elitist Ant System.
+    "ASRANK" : Rank-Based Ant System.
+    "MMAS"   : MAX-MIN Ant System.
+    "ACS"    : Ant Colony System.
+
+    Parámetros
+    ----------
+    dist_matrix : np.ndarray de shape (N, N)
+        Matriz de distancias. Las aristas inexistentes deben estar representadas
+        con np.inf.
+
+    variante : str
+        Variante de ACO a ejecutar: "AS", "EAS", "ASRANK", "MMAS" o "ACS".
+
+    n_hormigas : int o None
+        Número de hormigas por iteración. Si es None, se usa N para AS/EAS/
+        ASRANK/MMAS y 10 para ACS.
+
+    n_iteraciones : int
+        Número total de iteraciones.
+
+    alpha : float
+        Peso de la feromona.
+
+    beta : float
+        Peso de la heurística 1 / distancia.
+
+    evaporacion : float o None
+        Tasa de evaporación de feromonas. Si es None, se usan valores típicos:
+        AS/EAS: 0.5, ASRANK: 0.1, MMAS: 0.02, ACS: 0.1.
+
+    q : float
+        Factor de depósito de feromona.
+
+    tau0 : float o None
+        Valor inicial de feromona. Si es None, se calcula automáticamente.
+
+    ciclo_cerrado : bool
+        Si es True, se fuerza regreso al nodo inicial. Si es False, se resuelve
+        como TSP abierto.
+
+    seed : int
+        Semilla aleatoria.
+
+    verbose : bool
+        Si es True, muestra progreso cada 10 iteraciones.
+
+    peso_elite : int o None
+        Peso elitista para EAS. Si es None, se usa N.
+
+    w_rank : int
+        Número de hormigas que participan en ASrank. La mejor global también
+        deposita feromona con peso w_rank.
+
+    tau_min, tau_max : float o None
+        Límites de feromona para MMAS. Si son None, se calculan dinámicamente.
+
+    mmas_usar_mejor_global : bool
+        Si es True, MMAS actualiza con la mejor global. Si es False, actualiza
+        con la mejor de la iteración.
+
+    phi : float
+        Coeficiente de actualización local en ACS.
+
+    q0 : float
+        Factor de explotación en ACS. Si q < q0, se elige el mejor candidato;
+        si no, se usa selección probabilística.
+
+    acs_usar_mejor_global : bool
+        Si es True, ACS actualiza con la mejor global. Si es False, con la mejor
+        de la iteración.
+
+    aplicar_2opt : bool
+        Si es True, aplica una búsqueda local 2-opt limitada a las rutas válidas.
+
+    n_intentos_2opt : int
+        Número de intentos aleatorios de 2-opt por ruta válida.
+
+    Retorna
+    -------
+    mejor_camino : list de int
+        Mejor camino encontrado.
+
+    mejor_distancia : float
+        Distancia total del mejor camino.
+    """
+
+    rng = np.random.default_rng(seed)
+
+    variante = variante.upper()
+
+    if variante not in {"AS", "EAS", "ASRANK", "MMAS", "ACS"}:
+        raise ValueError(
+            "variante debe ser una de: 'AS', 'EAS', 'ASRANK', 'MMAS', 'ACS'"
+        )
+
+    n = dist_matrix.shape[0]
+
+    conectado, visitados = comprobar_conectividad(dist_matrix)
+
+    if not conectado:
+        raise ValueError(
+            f"El grafo no es conexo. Solo se alcanzan {len(visitados)} de {n} nodos. "
+            f"Prueba a aumentar k_vecinos o a generar más puntos intermedios."
+        )
+
+    if n_hormigas is None:
+        if variante == "ACS":
+            n_hormigas = min(10, n)
+        else:
+            n_hormigas = n
+
+    if evaporacion is None:
+        if variante in {"AS", "EAS"}:
+            evaporacion = 0.5
+        elif variante == "ASRANK":
+            evaporacion = 0.1
+        elif variante == "MMAS":
+            evaporacion = 0.02
+        elif variante == "ACS":
+            evaporacion = 0.1
+
+    if peso_elite is None:
+        peso_elite = n
+
+    mascara_aristas = np.isfinite(dist_matrix) & (dist_matrix > 0)
+
+    heuristica = np.zeros_like(dist_matrix, dtype=float)
+    heuristica[mascara_aristas] = 1.0 / dist_matrix[mascara_aristas]
+
+    def evaluar(camino):
+        return calcular_distancia_camino(
+            dist_matrix,
+            camino,
+            ciclo_cerrado=ciclo_cerrado
+        )
+
+    def estimar_distancia_nearest_neighbor():
+        """
+        Calcula una distancia inicial aproximada mediante nearest neighbor.
+        Si no logra una ruta válida, devuelve una estimación basada en la media
+        de aristas finitas.
+        """
+        mejor = np.inf
+
+        for inicio in range(n):
+            camino = [inicio]
+            no_visitados = set(range(n))
+            no_visitados.remove(inicio)
+            actual = inicio
+
+            while no_visitados:
+                candidatos = [
+                    j for j in no_visitados
+                    if np.isfinite(dist_matrix[actual, j])
+                ]
+
+                if not candidatos:
+                    break
+
+                siguiente = min(
+                    candidatos,
+                    key=lambda j: dist_matrix[actual, j]
+                )
+
+                camino.append(siguiente)
+                no_visitados.remove(siguiente)
+                actual = siguiente
+
+            if len(camino) == n:
+                d = evaluar(camino)
+                if d < mejor:
+                    mejor = d
+
+        if np.isfinite(mejor):
+            return mejor
+
+        valores_finitos = dist_matrix[mascara_aristas]
+
+        if len(valores_finitos) == 0:
+            raise ValueError("No hay aristas válidas en la matriz de distancias.")
+
+        return float(np.mean(valores_finitos) * max(1, n - 1))
+
+    c_nn = estimar_distancia_nearest_neighbor()
+
+    if tau0 is None:
+        if variante == "AS":
+            tau0 = n_hormigas / c_nn
+        elif variante == "EAS":
+            tau0 = (peso_elite + n_hormigas) / c_nn
+        elif variante == "ASRANK":
+            tau0 = 0.5 * w_rank * (w_rank - 1) / c_nn
+        elif variante == "MMAS":
+            tau0 = 1.0 / (evaporacion * c_nn)
+        elif variante == "ACS":
+            tau0 = 1.0 / (n * c_nn)
+
+    feromonas = np.zeros_like(dist_matrix, dtype=float)
+    feromonas[mascara_aristas] = tau0
+
+    def calcular_limites_mmas(mejor_distancia_actual):
+        """
+        Calcula tau_max y tau_min para MMAS.
+        """
+        if np.isfinite(mejor_distancia_actual):
+            tmax = 1.0 / (evaporacion * mejor_distancia_actual)
+        else:
+            tmax = tau0
+
+        grados = np.sum(mascara_aristas, axis=1)
+        avg = float(np.mean(grados))
+
+        if avg <= 1:
+            tmin = tmax * 0.01
+        else:
+            p_dec = 0.05 ** (1.0 / n)
+            tmin = tmax * (1.0 - p_dec) / ((avg - 1.0) * p_dec)
+
+        if not np.isfinite(tmin) or tmin <= 0:
+            tmin = tmax * 0.01
+
+        return tmin, tmax
+
+    def seleccionar_siguiente(actual, no_visitados):
+        """
+        Selección de siguiente nodo para AS, EAS, ASrank y MMAS.
+        En ACS se usa también como parte probabilística cuando q >= q0.
+        """
+        candidatos = [
+            j for j in no_visitados
+            if np.isfinite(dist_matrix[actual, j])
+        ]
+
+        if len(candidatos) == 0:
+            return None
+
+        valores = []
+
+        for j in candidatos:
+            tau = feromonas[actual, j] ** alpha
+            eta = heuristica[actual, j] ** beta
+            valores.append(tau * eta)
+
+        valores = np.asarray(valores, dtype=float)
+
+        if valores.sum() == 0 or not np.isfinite(valores.sum()):
+            probabilidades = np.ones(len(candidatos)) / len(candidatos)
+        else:
+            probabilidades = valores / valores.sum()
+
+        return int(rng.choice(candidatos, p=probabilidades))
+
+    def seleccionar_siguiente_acs(actual, no_visitados):
+        """
+        Regla pseudoaleatoria proporcional de ACS.
+        """
+        candidatos = [
+            j for j in no_visitados
+            if np.isfinite(dist_matrix[actual, j])
+        ]
+
+        if len(candidatos) == 0:
+            return None
+
+        valores = []
+
+        for j in candidatos:
+            tau = feromonas[actual, j] ** alpha
+            eta = heuristica[actual, j] ** beta
+            valores.append(tau * eta)
+
+        valores = np.asarray(valores, dtype=float)
+
+        if rng.random() < q0:
+            return int(candidatos[np.argmax(valores)])
+
+        if valores.sum() == 0 or not np.isfinite(valores.sum()):
+            probabilidades = np.ones(len(candidatos)) / len(candidatos)
+        else:
+            probabilidades = valores / valores.sum()
+
+        return int(rng.choice(candidatos, p=probabilidades))
+
+    def actualizar_local_acs(a, b):
+        """
+        Actualización local de ACS:
+        tau_ij = (1 - phi) * tau_ij + phi * tau0
+        """
+        feromonas[a, b] = (1.0 - phi) * feromonas[a, b] + phi * tau0
+        feromonas[b, a] = feromonas[a, b]
+
+    def construir_camino_hormiga():
+        """
+        Construye una solución con una hormiga.
+        """
+        inicio = int(rng.integers(0, n))
+
+        camino = [inicio]
+        no_visitados = set(range(n))
+        no_visitados.remove(inicio)
+
+        actual = inicio
+        distancia_total = 0.0
+        valido = True
+
+        while no_visitados:
+            if variante == "ACS":
+                siguiente = seleccionar_siguiente_acs(actual, no_visitados)
             else:
-                intentos_sin_mejora[i] += 1
+                siguiente = seleccionar_siguiente(actual, no_visitados)
 
-        # ========================================================
-        # 3. FASE DE ABEJAS EXPLORADORAS
-        # ========================================================
-        for i in range(n_fuentes):
-            if intentos_sin_mejora[i] >= limite:
-                fuentes[i] = crear_camino_greedy_aleatorio(dist_matrix, rng)
-                distancias[i] = evaluar(fuentes[i])
-                intentos_sin_mejora[i] = 0
+            if siguiente is None:
+                valido = False
+                break
 
-        # ========================================================
-        # Actualizar mejor solución global
-        # ========================================================
-        idx_mejor_iteracion = np.argmin(distancias)
+            distancia_total += dist_matrix[actual, siguiente]
+            camino.append(siguiente)
+            no_visitados.remove(siguiente)
 
-        if distancias[idx_mejor_iteracion] < mejor_distancia:
-            mejor_distancia = distancias[idx_mejor_iteracion]
-            mejor_camino = fuentes[idx_mejor_iteracion].copy()
+            if variante == "ACS":
+                actualizar_local_acs(actual, siguiente)
+
+            actual = siguiente
+
+        if valido and ciclo_cerrado:
+            inicio = camino[0]
+
+            if np.isfinite(dist_matrix[actual, inicio]):
+                distancia_total += dist_matrix[actual, inicio]
+                camino.append(inicio)
+
+                if variante == "ACS":
+                    actualizar_local_acs(actual, inicio)
+            else:
+                valido = False
+
+        if not valido:
+            return camino, np.inf
+
+        return camino, distancia_total
+
+    def aplicar_2opt_limitado(camino, distancia_actual):
+        """
+        2-opt limitado y compatible con TSP abierto/cerrado.
+        Solo acepta cambios si la nueva ruta sigue siendo válida y mejora.
+        """
+        if not np.isfinite(distancia_actual):
+            return camino, distancia_actual
+
+        mejor_camino_local = camino.copy()
+        mejor_distancia_local = distancia_actual
+
+        longitud = len(camino)
+
+        if ciclo_cerrado and camino[0] == camino[-1]:
+            base = camino[:-1]
+        else:
+            base = camino.copy()
+
+        if len(base) < 4:
+            return camino, distancia_actual
+
+        for _ in range(n_intentos_2opt):
+            i, j = sorted(rng.choice(len(base), size=2, replace=False))
+
+            if j - i < 2:
+                continue
+
+            candidato = base.copy()
+            candidato[i:j + 1] = reversed(candidato[i:j + 1])
+
+            if ciclo_cerrado:
+                candidato = candidato + [candidato[0]]
+
+            d = evaluar(candidato)
+
+            if d < mejor_distancia_local:
+                mejor_camino_local = candidato
+                mejor_distancia_local = d
+
+                if ciclo_cerrado:
+                    base = candidato[:-1]
+                else:
+                    base = candidato.copy()
+
+        return mejor_camino_local, mejor_distancia_local
+
+    def depositar_camino(camino, cantidad):
+        """
+        Deposita feromona en todas las aristas del camino.
+        """
+        for a, b in zip(camino[:-1], camino[1:]):
+            if np.isfinite(dist_matrix[a, b]):
+                feromonas[a, b] += cantidad
+                feromonas[b, a] += cantidad
+
+    def actualizar_feromonas_as(caminos_iteracion):
+        """
+        Ant System: todas las hormigas válidas depositan feromona.
+        """
+        feromonas[mascara_aristas] *= (1.0 - evaporacion)
+
+        for camino, distancia in caminos_iteracion:
+            if np.isfinite(distancia) and distancia > 0:
+                depositar_camino(camino, q / distancia)
+
+    def actualizar_feromonas_eas(caminos_iteracion, mejor_camino, mejor_distancia):
+        """
+        Elitist Ant System: AS + refuerzo extra sobre la mejor global.
+        """
+        actualizar_feromonas_as(caminos_iteracion)
+
+        if mejor_camino is not None and np.isfinite(mejor_distancia):
+            depositar_camino(mejor_camino, peso_elite * q / mejor_distancia)
+
+    def actualizar_feromonas_asrank(caminos_iteracion, mejor_camino, mejor_distancia):
+        """
+        ASrank: solo las mejores hormigas de la iteración depositan feromona
+        con peso según ranking. Además, la mejor global deposita con peso w.
+        """
+        feromonas[mascara_aristas] *= (1.0 - evaporacion)
+
+        validos = [
+            (camino, distancia)
+            for camino, distancia in caminos_iteracion
+            if np.isfinite(distancia) and distancia > 0
+        ]
+
+        validos.sort(key=lambda x: x[1])
+
+        limite_rank = min(w_rank - 1, len(validos))
+
+        for r in range(limite_rank):
+            camino, distancia = validos[r]
+            peso = w_rank - (r + 1)
+            depositar_camino(camino, peso * q / distancia)
+
+        if mejor_camino is not None and np.isfinite(mejor_distancia):
+            depositar_camino(mejor_camino, w_rank * q / mejor_distancia)
+
+    def actualizar_feromonas_mmas(caminos_iteracion, mejor_camino, mejor_distancia):
+        """
+        MMAS: solo actualiza la mejor hormiga de la iteración o la mejor global,
+        aplicando límites tau_min y tau_max.
+        """
+        nonlocal tau_min, tau_max
+
+        feromonas[mascara_aristas] *= (1.0 - evaporacion)
+
+        validos = [
+            (camino, distancia)
+            for camino, distancia in caminos_iteracion
+            if np.isfinite(distancia) and distancia > 0
+        ]
+
+        if len(validos) == 0:
+            feromonas[mascara_aristas] = np.clip(
+                feromonas[mascara_aristas],
+                tau_min if tau_min is not None else 0.0,
+                tau_max if tau_max is not None else np.inf
+            )
+            return
+
+        mejor_iter_camino, mejor_iter_distancia = min(
+            validos,
+            key=lambda x: x[1]
+        )
+
+        if mmas_usar_mejor_global and mejor_camino is not None and np.isfinite(mejor_distancia):
+            camino_deposito = mejor_camino
+            distancia_deposito = mejor_distancia
+        else:
+            camino_deposito = mejor_iter_camino
+            distancia_deposito = mejor_iter_distancia
+
+        if tau_min is None or tau_max is None:
+            tau_min_calc, tau_max_calc = calcular_limites_mmas(distancia_deposito)
+
+            if tau_min is None:
+                tau_min = tau_min_calc
+
+            if tau_max is None:
+                tau_max = tau_max_calc
+
+        depositar_camino(camino_deposito, q / distancia_deposito)
+
+        feromonas[mascara_aristas] = np.clip(
+            feromonas[mascara_aristas],
+            tau_min,
+            tau_max
+        )
+
+    def actualizar_feromonas_acs(caminos_iteracion, mejor_camino, mejor_distancia):
+        """
+        ACS: actualización global solo en las aristas de la mejor solución.
+        Las aristas que no pertenecen a la mejor ruta no se modifican aquí.
+        """
+        validos = [
+            (camino, distancia)
+            for camino, distancia in caminos_iteracion
+            if np.isfinite(distancia) and distancia > 0
+        ]
+
+        if acs_usar_mejor_global and mejor_camino is not None and np.isfinite(mejor_distancia):
+            camino_deposito = mejor_camino
+            distancia_deposito = mejor_distancia
+        else:
+            if len(validos) == 0:
+                return
+
+            camino_deposito, distancia_deposito = min(
+                validos,
+                key=lambda x: x[1]
+            )
+
+        deposito = 1.0 / distancia_deposito
+
+        for a, b in zip(camino_deposito[:-1], camino_deposito[1:]):
+            if np.isfinite(dist_matrix[a, b]):
+                feromonas[a, b] = (
+                    (1.0 - evaporacion) * feromonas[a, b]
+                    + evaporacion * deposito
+                )
+                feromonas[b, a] = feromonas[a, b]
+
+    # ------------------------------------------------------------
+    # Inicialización de mejor solución
+    # ------------------------------------------------------------
+    mejor_camino = None
+    mejor_distancia = np.inf
+
+    # Inicializar límites MMAS si procede
+    if variante == "MMAS":
+        tau_min_ini, tau_max_ini = calcular_limites_mmas(c_nn)
+
+        if tau_min is None:
+            tau_min = tau_min_ini
+
+        if tau_max is None:
+            tau_max = tau_max_ini
+
+        feromonas[mascara_aristas] = tau_max
+
+    # ------------------------------------------------------------
+    # Bucle principal
+    # ------------------------------------------------------------
+    historial = []
+    tiempo_inicio_total = time.perf_counter()
+
+    for it in range(n_iteraciones):
+        tiempo_inicio_iteracion = time.perf_counter()
+
+        caminos_iteracion = []
+
+        for _ in range(n_hormigas):
+            camino, distancia = construir_camino_hormiga()
+
+            if aplicar_2opt and np.isfinite(distancia):
+                camino, distancia = aplicar_2opt_limitado(camino, distancia)
+
+            caminos_iteracion.append((camino, distancia))
+
+            if distancia < mejor_distancia:
+                mejor_distancia = distancia
+                mejor_camino = camino.copy()
+
+        if variante == "AS":
+            actualizar_feromonas_as(caminos_iteracion)
+
+        elif variante == "EAS":
+            actualizar_feromonas_eas(
+                caminos_iteracion,
+                mejor_camino,
+                mejor_distancia
+            )
+
+        elif variante == "ASRANK":
+            actualizar_feromonas_asrank(
+                caminos_iteracion,
+                mejor_camino,
+                mejor_distancia
+            )
+
+        elif variante == "MMAS":
+            actualizar_feromonas_mmas(
+                caminos_iteracion,
+                mejor_camino,
+                mejor_distancia
+            )
+
+        elif variante == "ACS":
+            actualizar_feromonas_acs(
+                caminos_iteracion,
+                mejor_camino,
+                mejor_distancia
+            )
+        
+        distancias_validas = [
+            d for _, d in caminos_iteracion
+            if np.isfinite(d)
+        ]
+
+        validas = len(distancias_validas)
+
+        if validas > 0:
+            mejor_distancia_iteracion = float(np.min(distancias_validas))
+            media_validas = float(np.mean(distancias_validas))
+            peor_valida = float(np.max(distancias_validas))
+        else:
+            mejor_distancia_iteracion = np.inf
+            media_validas = np.inf
+            peor_valida = np.inf
+
+        tiempo_iteracion = time.perf_counter() - tiempo_inicio_iteracion
+        tiempo_total = time.perf_counter() - tiempo_inicio_total
+
+        tau_valores = feromonas[mascara_aristas]
+
+        if len(tau_valores) > 0:
+            tau_media_actual = float(np.mean(tau_valores))
+            tau_min_actual = float(np.min(tau_valores))
+            tau_max_actual = float(np.max(tau_valores))
+        else:
+            tau_media_actual = np.nan
+            tau_min_actual = np.nan
+            tau_max_actual = np.nan
+
+        historial.append({
+            "algoritmo": variante,
+            "iteracion": it + 1,
+            "mejor_distancia_global": float(mejor_distancia),
+            "mejor_distancia_iteracion": float(mejor_distancia_iteracion),
+            "media_distancias_validas": float(media_validas),
+            "peor_distancia_valida": float(peor_valida),
+            "rutas_validas": int(validas),
+            "n_hormigas": int(n_hormigas),
+            "tiempo_iteracion": float(tiempo_iteracion),
+            "tiempo_total": float(tiempo_total),
+            "tau_media": float(tau_media_actual),
+            "tau_min": float(tau_min_actual),
+            "tau_max": float(tau_max_actual)
+        })
 
         if verbose and (it + 1) % 10 == 0:
-            validas = np.sum(np.isfinite(distancias))
+            validas = sum(
+                1 for _, d in caminos_iteracion
+                if np.isfinite(d)
+            )
 
             print(
                 f"Iteración {it + 1}/{n_iteraciones} | "
-                f"Mejor distancia: {mejor_distancia:.4f}"# | "
-                # f"Rutas válidas: {validas}/{n_fuentes}"
+                f"Variante: {variante} | "
+                f"Mejor distancia: {mejor_distancia:.4f} | "
+                f"Mejor iteración: {mejor_distancia_iteracion:.4f} | "
+                f"Rutas válidas: {validas}/{n_hormigas} | "
+                f"Tiempo iteración: {tiempo_iteracion:.4f}s"
             )
 
-    return mejor_camino, mejor_distancia
+    if mejor_camino is None or not np.isfinite(mejor_distancia):
+        raise ValueError(
+            "No se ha encontrado ninguna ruta válida. "
+            "Prueba a aumentar k_vecinos, n_hormigas, n_iteraciones "
+            "o a generar más viewpoints."
+        )
+
+    return mejor_camino, mejor_distancia, historial
+
+def aplicar_ant_system(
+    dist_matrix,
+    n_hormigas=None,
+    n_iteraciones=200,
+    alpha=1.0,
+    beta=4.0,
+    evaporacion=0.5,
+    q=1.0,
+    tau0=None,
+    ciclo_cerrado=False,
+    seed=17,
+    verbose=True,
+    aplicar_2opt=False
+):
+    return aplicar_aco_variante(
+        dist_matrix=dist_matrix,
+        variante="AS",
+        n_hormigas=n_hormigas,
+        n_iteraciones=n_iteraciones,
+        alpha=alpha,
+        beta=beta,
+        evaporacion=evaporacion,
+        q=q,
+        tau0=tau0,
+        ciclo_cerrado=ciclo_cerrado,
+        seed=seed,
+        verbose=verbose,
+        aplicar_2opt=aplicar_2opt
+    )
+
+
+def aplicar_elitist_ant_system(
+    dist_matrix,
+    n_hormigas=None,
+    n_iteraciones=200,
+    alpha=1.0,
+    beta=4.0,
+    evaporacion=0.5,
+    q=1.0,
+    tau0=None,
+    peso_elite=None,
+    ciclo_cerrado=False,
+    seed=17,
+    verbose=True,
+    aplicar_2opt=False
+):
+    return aplicar_aco_variante(
+        dist_matrix=dist_matrix,
+        variante="EAS",
+        n_hormigas=n_hormigas,
+        n_iteraciones=n_iteraciones,
+        alpha=alpha,
+        beta=beta,
+        evaporacion=evaporacion,
+        q=q,
+        tau0=tau0,
+        peso_elite=peso_elite,
+        ciclo_cerrado=ciclo_cerrado,
+        seed=seed,
+        verbose=verbose,
+        aplicar_2opt=aplicar_2opt
+    )
+
+
+def aplicar_as_ranked(
+    dist_matrix,
+    n_hormigas=None,
+    n_iteraciones=200,
+    alpha=1.0,
+    beta=4.0,
+    evaporacion=0.1,
+    q=1.0,
+    tau0=None,
+    w_rank=6,
+    ciclo_cerrado=False,
+    seed=17,
+    verbose=True,
+    aplicar_2opt=False
+):
+    return aplicar_aco_variante(
+        dist_matrix=dist_matrix,
+        variante="ASRANK",
+        n_hormigas=n_hormigas,
+        n_iteraciones=n_iteraciones,
+        alpha=alpha,
+        beta=beta,
+        evaporacion=evaporacion,
+        q=q,
+        tau0=tau0,
+        w_rank=w_rank,
+        ciclo_cerrado=ciclo_cerrado,
+        seed=seed,
+        verbose=verbose,
+        aplicar_2opt=aplicar_2opt
+    )
+
+
+def aplicar_min_max_ant_system(
+    dist_matrix,
+    n_hormigas=None,
+    n_iteraciones=200,
+    alpha=1.0,
+    beta=4.0,
+    evaporacion=0.02,
+    q=1.0,
+    tau0=None,
+    tau_min=None,
+    tau_max=None,
+    mmas_usar_mejor_global=True,
+    ciclo_cerrado=False,
+    seed=17,
+    verbose=True,
+    aplicar_2opt=False
+):
+    return aplicar_aco_variante(
+        dist_matrix=dist_matrix,
+        variante="MMAS",
+        n_hormigas=n_hormigas,
+        n_iteraciones=n_iteraciones,
+        alpha=alpha,
+        beta=beta,
+        evaporacion=evaporacion,
+        q=q,
+        tau0=tau0,
+        tau_min=tau_min,
+        tau_max=tau_max,
+        mmas_usar_mejor_global=mmas_usar_mejor_global,
+        ciclo_cerrado=ciclo_cerrado,
+        seed=seed,
+        verbose=verbose,
+        aplicar_2opt=aplicar_2opt
+    )
+
+
+def aplicar_ant_colony_system(
+    dist_matrix,
+    n_hormigas=10,
+    n_iteraciones=200,
+    alpha=1.0,
+    beta=4.0,
+    evaporacion=0.1,
+    q=1.0,
+    tau0=None,
+    phi=0.1,
+    q0=0.9,
+    acs_usar_mejor_global=True,
+    ciclo_cerrado=False,
+    seed=17,
+    verbose=True,
+    aplicar_2opt=False
+):
+    return aplicar_aco_variante(
+        dist_matrix=dist_matrix,
+        variante="ACS",
+        n_hormigas=n_hormigas,
+        n_iteraciones=n_iteraciones,
+        alpha=alpha,
+        beta=beta,
+        evaporacion=evaporacion,
+        q=q,
+        tau0=tau0,
+        phi=phi,
+        q0=q0,
+        acs_usar_mejor_global=acs_usar_mejor_global,
+        ciclo_cerrado=ciclo_cerrado,
+        seed=seed,
+        verbose=verbose,
+        aplicar_2opt=aplicar_2opt
+    )
