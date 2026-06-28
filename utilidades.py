@@ -155,7 +155,7 @@ def exportar_ruta_meshlab(viewpoints, camino, output_dir, nombre_ruta="ruta_aco_
             mesh_ruta += cilindro
 
     path_ruta = Path(output_dir) / nombre_ruta
-    o3d.io.write_triangle_mesh(path_ruta, mesh_ruta)
+    o3d.io.write_triangle_mesh(str(path_ruta), mesh_ruta)
     print(f"\n└──Ruta guardada en: {path_ruta}")
 
     return path_ruta

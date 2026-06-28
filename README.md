@@ -4,7 +4,7 @@
 
 Este proyecto implementa un sistema de planificación de rutas sobre escenarios tridimensionales con el objetivo de generar trayectorias de inspección a partir de un conjunto de puntos de vista o *viewpoints*. El flujo de trabajo parte de una malla 3D, genera automáticamente puntos de observación alrededor del escenario, construye un grafo de visibilidad entre dichos puntos y aplica distintos algoritmos de optimización para obtener una ruta de recorrido eficiente.
 
-El problema se modela como una variante abierta del problema del viajante (*Travelling Salesman Problem*, TSP), donde cada nodo representa un viewpoint y las aristas representan conexiones válidas entre puntos siempre que el segmento que los une no atraviese la geometría del escenario.
+El problema se modela como una variante abierta del problema del viajante (*Travelling Salesman Problem*, TSP), donde cada nodo representa un viewpoint, las aristas representan conexiones válidas entre puntos siempre que el segmento que los une no atraviese la geometría del escenario, el peso de cada arista es la distancia euclidiana entre nodos. TSP Abierto hace referencia a que la ruta no tiene que volver obligatoriamente al nodo inicial.
 
 El proyecto compara distintas variantes de Ant Colony Optimization (ACO) y utiliza Simulated Annealing (SA) como algoritmo de referencia externo.
 

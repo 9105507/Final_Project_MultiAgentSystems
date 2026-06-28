@@ -210,6 +210,14 @@ def aplicar_simulated_annealing(
 
     mejor_distancia : float
         Distancia total del mejor camino.
+
+    historial : list de dict
+        Lista con la información registrada en cada iteración del algoritmo.
+        Cada elemento contiene métricas como la mejor distancia global, la
+        distancia actual, la distancia del vecino generado, la temperatura,
+        el número de soluciones aceptadas, si el vecino fue aceptado en la
+        iteración, el tiempo de ejecución de la iteración y el tiempo total
+        acumulado.
     """
 
     rng = np.random.default_rng(seed)
