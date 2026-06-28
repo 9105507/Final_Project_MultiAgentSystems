@@ -395,6 +395,7 @@ def aplicar_simulated_annealing(
             camino_actual = vecino
             distancia_actual = distancia_vecino
             aceptadas += 1
+            aceptada_iteracion = True
 
             if distancia_actual < mejor_distancia:
                 mejor_distancia = distancia_actual
@@ -472,10 +473,6 @@ def aplicar_aco_variante(
     phi=0.1,
     q0=0.9,
     acs_usar_mejor_global=True,
-
-    # Búsqueda local opcional
-    aplicar_2opt=False,
-    n_intentos_2opt=80
 ):
     """
     Aplica diferentes variantes de Ant Colony Optimization para resolver una
@@ -557,12 +554,6 @@ def aplicar_aco_variante(
         Si es True, ACS actualiza con la mejor global. Si es False, con la mejor
         de la iteración.
 
-    aplicar_2opt : bool
-        Si es True, aplica una búsqueda local 2-opt limitada a las rutas válidas.
-
-    n_intentos_2opt : int
-        Número de intentos aleatorios de 2-opt por ruta válida.
-
     Retorna
     -------
     mejor_camino : list de int
@@ -570,51 +561,15 @@ def aplicar_aco_variante(
 
     mejor_distancia : float
         Distancia total del mejor camino.
+    
+    historial : list de dict
+        Lista con la información registrada en cada iteración del algoritmo.
+        Cada elemento del historial contiene métricas como la mejor distancia
+        global hasta el momento, la mejor distancia de la iteración, la media
+        de las distancias válidas, el número de rutas válidas, el tiempo de
+        ejecución de la iteración, el tiempo acumulado y estadísticas de la
+        matriz de feromonas.
     """
-
-    rng = np.random.default_rng(seed)
-
-    variante = variante.upper()
-
-    if variante not in {"AS", "EAS", "ASRANK", "MMAS", "ACS"}:
-        raise ValueError(
-            "variante debe ser una de: 'AS', 'EAS', 'ASRANK', 'MMAS', 'ACS'"
-        )
-
-    n = dist_matrix.shape[0]
-
-    conectado, visitados = comprobar_conectividad(dist_matrix)
-
-    if not conectado:
-        raise ValueError(
-            f"El grafo no es conexo. Solo se alcanzan {len(visitados)} de {n} nodos. "
-            f"Prueba a aumentar k_vecinos o a generar más puntos intermedios."
-        )
-
-    if n_hormigas is None:
-        if variante == "ACS":
-            n_hormigas = min(10, n)
-        else:
-            n_hormigas = n
-
-    if evaporacion is None:
-        if variante in {"AS", "EAS"}:
-            evaporacion = 0.5
-        elif variante == "ASRANK":
-            evaporacion = 0.1
-        elif variante == "MMAS":
-            evaporacion = 0.02
-        elif variante == "ACS":
-            evaporacion = 0.1
-
-    if peso_elite is None:
-        peso_elite = n
-
-    mascara_aristas = np.isfinite(dist_matrix) & (dist_matrix > 0)
-
-    heuristica = np.zeros_like(dist_matrix, dtype=float)
-    heuristica[mascara_aristas] = 1.0 / dist_matrix[mascara_aristas]
-
     def evaluar(camino):
         return calcular_distancia_camino(
             dist_matrix,
@@ -668,24 +623,7 @@ def aplicar_aco_variante(
             raise ValueError("No hay aristas válidas en la matriz de distancias.")
 
         return float(np.mean(valores_finitos) * max(1, n - 1))
-
-    c_nn = estimar_distancia_nearest_neighbor()
-
-    if tau0 is None:
-        if variante == "AS":
-            tau0 = n_hormigas / c_nn
-        elif variante == "EAS":
-            tau0 = (peso_elite + n_hormigas) / c_nn
-        elif variante == "ASRANK":
-            tau0 = 0.5 * w_rank * (w_rank - 1) / c_nn
-        elif variante == "MMAS":
-            tau0 = 1.0 / (evaporacion * c_nn)
-        elif variante == "ACS":
-            tau0 = 1.0 / (n * c_nn)
-
-    feromonas = np.zeros_like(dist_matrix, dtype=float)
-    feromonas[mascara_aristas] = tau0
-
+    
     def calcular_limites_mmas(mejor_distancia_actual):
         """
         Calcula tau_max y tau_min para MMAS.
@@ -827,52 +765,6 @@ def aplicar_aco_variante(
 
         return camino, distancia_total
 
-    def aplicar_2opt_limitado(camino, distancia_actual):
-        """
-        2-opt limitado y compatible con TSP abierto/cerrado.
-        Solo acepta cambios si la nueva ruta sigue siendo válida y mejora.
-        """
-        if not np.isfinite(distancia_actual):
-            return camino, distancia_actual
-
-        mejor_camino_local = camino.copy()
-        mejor_distancia_local = distancia_actual
-
-        longitud = len(camino)
-
-        if ciclo_cerrado and camino[0] == camino[-1]:
-            base = camino[:-1]
-        else:
-            base = camino.copy()
-
-        if len(base) < 4:
-            return camino, distancia_actual
-
-        for _ in range(n_intentos_2opt):
-            i, j = sorted(rng.choice(len(base), size=2, replace=False))
-
-            if j - i < 2:
-                continue
-
-            candidato = base.copy()
-            candidato[i:j + 1] = reversed(candidato[i:j + 1])
-
-            if ciclo_cerrado:
-                candidato = candidato + [candidato[0]]
-
-            d = evaluar(candidato)
-
-            if d < mejor_distancia_local:
-                mejor_camino_local = candidato
-                mejor_distancia_local = d
-
-                if ciclo_cerrado:
-                    base = candidato[:-1]
-                else:
-                    base = candidato.copy()
-
-        return mejor_camino_local, mejor_distancia_local
-
     def depositar_camino(camino, cantidad):
         """
         Deposita feromona en todas las aristas del camino.
@@ -1011,6 +903,66 @@ def aplicar_aco_variante(
                 )
                 feromonas[b, a] = feromonas[a, b]
 
+    rng = np.random.default_rng(seed)
+
+    variante = variante.upper()
+
+    if variante not in {"AS", "EAS", "ASRANK", "MMAS", "ACS"}:
+        raise ValueError(
+            "variante debe ser una de: 'AS', 'EAS', 'ASRANK', 'MMAS', 'ACS'"
+        )
+
+    n = dist_matrix.shape[0]
+
+    conectado, visitados = comprobar_conectividad(dist_matrix)
+
+    if not conectado:
+        raise ValueError(
+            f"El grafo no es conexo. Solo se alcanzan {len(visitados)} de {n} nodos. "
+            f"Prueba a aumentar k_vecinos o a generar más puntos intermedios."
+        )
+
+    if n_hormigas is None:
+        if variante == "ACS":
+            n_hormigas = min(10, n)
+        else:
+            n_hormigas = n
+
+    if evaporacion is None:
+        if variante in {"AS", "EAS"}:
+            evaporacion = 0.5
+        elif variante == "ASRANK":
+            evaporacion = 0.1
+        elif variante == "MMAS":
+            evaporacion = 0.02
+        elif variante == "ACS":
+            evaporacion = 0.1
+
+    if peso_elite is None:
+        peso_elite = n
+
+    mascara_aristas = np.isfinite(dist_matrix) & (dist_matrix > 0)
+
+    heuristica = np.zeros_like(dist_matrix, dtype=float)
+    heuristica[mascara_aristas] = 1.0 / dist_matrix[mascara_aristas]
+
+    c_nn = estimar_distancia_nearest_neighbor()
+
+    if tau0 is None:
+        if variante == "AS":
+            tau0 = n_hormigas / c_nn
+        elif variante == "EAS":
+            tau0 = (peso_elite + n_hormigas) / c_nn
+        elif variante == "ASRANK":
+            tau0 = 0.5 * w_rank * (w_rank - 1) / c_nn
+        elif variante == "MMAS":
+            tau0 = 1.0 / (evaporacion * c_nn)
+        elif variante == "ACS":
+            tau0 = 1.0 / (n * c_nn)
+
+    feromonas = np.zeros_like(dist_matrix, dtype=float)
+    feromonas[mascara_aristas] = tau0
+
     # ------------------------------------------------------------
     # Inicialización de mejor solución
     # ------------------------------------------------------------
@@ -1042,9 +994,6 @@ def aplicar_aco_variante(
 
         for _ in range(n_hormigas):
             camino, distancia = construir_camino_hormiga()
-
-            if aplicar_2opt and np.isfinite(distancia):
-                camino, distancia = aplicar_2opt_limitado(camino, distancia)
 
             caminos_iteracion.append((camino, distancia))
 
@@ -1164,8 +1113,7 @@ def aplicar_ant_system(
     tau0=None,
     ciclo_cerrado=False,
     seed=17,
-    verbose=True,
-    aplicar_2opt=False
+    verbose=True
 ):
     return aplicar_aco_variante(
         dist_matrix=dist_matrix,
@@ -1179,8 +1127,7 @@ def aplicar_ant_system(
         tau0=tau0,
         ciclo_cerrado=ciclo_cerrado,
         seed=seed,
-        verbose=verbose,
-        aplicar_2opt=aplicar_2opt
+        verbose=verbose
     )
 
 
@@ -1196,8 +1143,7 @@ def aplicar_elitist_ant_system(
     peso_elite=None,
     ciclo_cerrado=False,
     seed=17,
-    verbose=True,
-    aplicar_2opt=False
+    verbose=True
 ):
     return aplicar_aco_variante(
         dist_matrix=dist_matrix,
@@ -1212,8 +1158,7 @@ def aplicar_elitist_ant_system(
         peso_elite=peso_elite,
         ciclo_cerrado=ciclo_cerrado,
         seed=seed,
-        verbose=verbose,
-        aplicar_2opt=aplicar_2opt
+        verbose=verbose
     )
 
 
@@ -1229,8 +1174,7 @@ def aplicar_as_ranked(
     w_rank=6,
     ciclo_cerrado=False,
     seed=17,
-    verbose=True,
-    aplicar_2opt=False
+    verbose=True
 ):
     return aplicar_aco_variante(
         dist_matrix=dist_matrix,
@@ -1245,8 +1189,7 @@ def aplicar_as_ranked(
         w_rank=w_rank,
         ciclo_cerrado=ciclo_cerrado,
         seed=seed,
-        verbose=verbose,
-        aplicar_2opt=aplicar_2opt
+        verbose=verbose
     )
 
 
@@ -1264,8 +1207,7 @@ def aplicar_min_max_ant_system(
     mmas_usar_mejor_global=True,
     ciclo_cerrado=False,
     seed=17,
-    verbose=True,
-    aplicar_2opt=False
+    verbose=True
 ):
     return aplicar_aco_variante(
         dist_matrix=dist_matrix,
@@ -1282,8 +1224,7 @@ def aplicar_min_max_ant_system(
         mmas_usar_mejor_global=mmas_usar_mejor_global,
         ciclo_cerrado=ciclo_cerrado,
         seed=seed,
-        verbose=verbose,
-        aplicar_2opt=aplicar_2opt
+        verbose=verbose
     )
 
 
@@ -1301,8 +1242,7 @@ def aplicar_ant_colony_system(
     acs_usar_mejor_global=True,
     ciclo_cerrado=False,
     seed=17,
-    verbose=True,
-    aplicar_2opt=False
+    verbose=True
 ):
     return aplicar_aco_variante(
         dist_matrix=dist_matrix,
@@ -1319,6 +1259,5 @@ def aplicar_ant_colony_system(
         acs_usar_mejor_global=acs_usar_mejor_global,
         ciclo_cerrado=ciclo_cerrado,
         seed=seed,
-        verbose=verbose,
-        aplicar_2opt=aplicar_2opt
+        verbose=verbose
     )

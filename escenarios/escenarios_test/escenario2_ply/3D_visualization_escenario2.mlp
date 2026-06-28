@@ -1,0 +1,78 @@
+<!DOCTYPE MeshLabDocument>
+<MeshLabProject>
+ <MeshGroup>
+  <MLMesh idInFile="-1" filename="01_D_puntos_desplazados_filtrados.ply" label="01_D_puntos_desplazados_filtrados.ply" visible="1">
+   <MLMatrix44>
+1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 
+</MLMatrix44>
+   <RenderingOption wireColor="64 64 64 255" wireWidth="1" boxColor="234 234 234 255" pointColor="39 32 252 255" solidColor="192 192 192 255" pointSize="4">000000000000000000000000000000000000000010100000000100111011110000101101</RenderingOption>
+  </MLMesh>
+  <MLMesh idInFile="-1" filename="02_centroides_primera_fase.ply" label="02_centroides_primera_fase.ply" visible="1">
+   <MLMatrix44>
+1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 
+</MLMatrix44>
+   <RenderingOption wireColor="64 64 64 255" wireWidth="1" boxColor="234 234 234 255" pointColor="37 241 252 255" solidColor="192 192 192 255" pointSize="5">000000000000000000000000000000000000000010100000000100111011110000101101</RenderingOption>
+  </MLMesh>
+  <MLMesh idInFile="-1" filename="03_centroides_filtrados_distancia.ply" label="03_centroides_filtrados_distancia.ply" visible="1">
+   <MLMatrix44>
+1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 
+</MLMatrix44>
+   <RenderingOption wireColor="64 64 64 255" wireWidth="1" boxColor="234 234 234 255" pointColor="34 252 48 255" solidColor="192 192 192 255" pointSize="5">000000000000000000000000000000000000000010100000000100111011110000101101</RenderingOption>
+  </MLMesh>
+  <MLMesh idInFile="-1" filename="04_viewpoints_finales.ply" label="04_viewpoints_finales.ply" visible="1">
+   <MLMatrix44>
+1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 
+</MLMatrix44>
+   <RenderingOption wireColor="64 64 64 255" wireWidth="1" boxColor="234 234 234 255" pointColor="252 22 6 255" solidColor="192 192 192 255" pointSize="7">000110000000000000000000000000000000000010100000000100111011110000101101</RenderingOption>
+  </MLMesh>
+  <MLMesh idInFile="-1" filename="escenario2.ply" label="escenario2.ply" visible="1">
+   <MLMatrix44>
+1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 
+</MLMatrix44>
+   <RenderingOption wireColor="198 207 28 255" wireWidth="1" boxColor="234 234 234 255" pointColor="252 233 79 255" solidColor="192 192 192 255" pointSize="3">010001010000000000000011000001000110010010100000010100111010100000000001</RenderingOption>
+  </MLMesh>
+  <MLMesh idInFile="-1" filename="grafo_escenario2_k20.ply" label="grafo_escenario2_k20.ply" visible="1">
+   <MLMatrix44>
+1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 
+</MLMatrix44>
+   <RenderingOption wireColor="64 64 64 255" wireWidth="1" boxColor="234 234 234 255" pointColor="252 233 79 255" solidColor="192 192 192 255" pointSize="3">000001010000000000000000000001000110000010100000000100111010100000001001</RenderingOption>
+  </MLMesh>
+  <MLMesh idInFile="-1" filename="ruta_aco_acs_meshlab.ply" label="ruta_aco_acs_meshlab.ply" visible="1">
+   <MLMatrix44>
+1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 
+</MLMatrix44>
+   <RenderingOption wireColor="64 64 64 255" wireWidth="1" boxColor="234 234 234 255" pointColor="252 233 79 255" solidColor="192 192 192 255" pointSize="3">100001010000000000000000000001010110000010100000000100111010100000001001</RenderingOption>
+  </MLMesh>
+  <MLMesh idInFile="-1" filename="ruta_aco_as_meshlab.ply" label="ruta_aco_as_meshlab.ply" visible="1">
+   <MLMatrix44>
+1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 
+</MLMatrix44>
+   <RenderingOption wireColor="64 64 64 255" wireWidth="1" boxColor="234 234 234 255" pointColor="252 233 79 255" solidColor="192 192 192 255" pointSize="3">000001010000000000000000000001000110000010100000000100111010100000001001</RenderingOption>
+  </MLMesh>
+  <MLMesh idInFile="-1" filename="ruta_aco_as_rank_meshlab.ply" label="ruta_aco_as_rank_meshlab.ply" visible="1">
+   <MLMatrix44>
+1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 
+</MLMatrix44>
+   <RenderingOption wireColor="64 64 64 255" wireWidth="1" boxColor="234 234 234 255" pointColor="252 233 79 255" solidColor="192 192 192 255" pointSize="3">000001010000000000000000000001000110000010100000000100111010100000001001</RenderingOption>
+  </MLMesh>
+  <MLMesh idInFile="-1" filename="ruta_aco_eas_meshlab.ply" label="ruta_aco_eas_meshlab.ply" visible="1">
+   <MLMatrix44>
+1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 
+</MLMatrix44>
+   <RenderingOption wireColor="64 64 64 255" wireWidth="1" boxColor="234 234 234 255" pointColor="252 233 79 255" solidColor="192 192 192 255" pointSize="3">000001010000000000000000000001000110000010100000000100111010100000001001</RenderingOption>
+  </MLMesh>
+  <MLMesh idInFile="-1" filename="ruta_aco_mmas_meshlab.ply" label="ruta_aco_mmas_meshlab.ply" visible="1">
+   <MLMatrix44>
+1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 
+</MLMatrix44>
+   <RenderingOption wireColor="64 64 64 255" wireWidth="1" boxColor="234 234 234 255" pointColor="252 233 79 255" solidColor="192 192 192 255" pointSize="3">000001010000000000000000000001000110000010100000000100111010100000001001</RenderingOption>
+  </MLMesh>
+  <MLMesh idInFile="-1" filename="ruta_sa_meshlab.ply" label="ruta_sa_meshlab.ply" visible="1">
+   <MLMatrix44>
+1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 
+</MLMatrix44>
+   <RenderingOption wireColor="64 64 64 255" wireWidth="1" boxColor="234 234 234 255" pointColor="252 233 79 255" solidColor="192 192 192 255" pointSize="3">100001010000000000000000000001010110000010100000000100111010100000001001</RenderingOption>
+  </MLMesh>
+ </MeshGroup>
+ <RasterGroup/>
+</MeshLabProject>

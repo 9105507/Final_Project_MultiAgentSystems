@@ -160,6 +160,84 @@ def exportar_ruta_meshlab(viewpoints, camino, output_dir, nombre_ruta="ruta_aco_
 
     return path_ruta
 
+def exportar_grafo_meshlab(
+    viewpoints,
+    dist_matrix,
+    output_dir,
+    nombre_grafo="grafo_viewpoints_meshlab.ply",
+    color_aristas=(0.0, 0.0, 1.0),
+    radio_aristas=0.006
+):
+    """
+    Exporta el grafo de viewpoints como una malla PLY visualizable en MeshLab.
+
+    Solo se exportan las aristas cuya distancia en dist_matrix es finita.
+
+    Parámetros
+    ----------
+    viewpoints : np.ndarray de shape (N, 3)
+        Coordenadas 3D de los puntos de vista.
+
+    dist_matrix : np.ndarray de shape (N, N)
+        Matriz de distancias del grafo. Las conexiones inexistentes deben estar
+        representadas con np.inf.
+
+    output_dir : str
+        Carpeta de salida.
+
+    nombre_grafo : str
+        Nombre del archivo PLY generado.
+
+    color_aristas : tuple
+        Color RGB normalizado para las aristas.
+
+    radio_aristas : float
+        Radio de los cilindros de las aristas.
+
+    Retorna
+    -------
+    path_grafo : pathlib.Path
+        Ruta del archivo PLY exportado.
+    """
+
+    os.makedirs(output_dir, exist_ok=True)
+
+    viewpoints = np.asarray(viewpoints, dtype=float)
+    n = viewpoints.shape[0]
+
+    mesh_grafo = o3d.geometry.TriangleMesh()
+
+    # ------------------------------------------------------------
+    # Crear aristas como cilindros
+    # ------------------------------------------------------------
+    aristas_exportadas = 0
+
+    for i in range(n):
+        for j in range(i + 1, n):
+            if np.isfinite(dist_matrix[i, j]) and dist_matrix[i, j] > 0:
+                cilindro = crear_cilindro_entre_puntos(
+                    viewpoints[i],
+                    viewpoints[j],
+                    radio=radio_aristas,
+                    color=color_aristas
+                )
+
+                if cilindro is not None:
+                    mesh_grafo += cilindro
+                    aristas_exportadas += 1
+
+    path_grafo = Path(output_dir) / nombre_grafo
+
+    o3d.io.write_triangle_mesh(
+        str(path_grafo),
+        mesh_grafo,
+        write_ascii=True
+    )
+
+    print(f"\n└──Grafo guardado en: {path_grafo}")
+
+    return path_grafo
+
 def centrar_ventana(ancho_ventana=1000, alto_ventana=800):
     """
     Calcula la posición necesaria para centrar una ventana en la pantalla.
