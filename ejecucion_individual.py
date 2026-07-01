@@ -147,7 +147,7 @@ if __name__ == "__main__":
     sobre dicho grafo para generar una ruta resolviendo TSP Abierto.
     """
     # Opciones: "ACO_AS", "ACO_EAS", "ACO_AS_RANK", "ACO_MMAS", "ACO_ACS" y "SA"
-    algoritmo = "SA"
+    algoritmo = "ACO_AS"
 
     # Los escenarios vienen normalizados a una caja unitaria.
     escenario = 1
